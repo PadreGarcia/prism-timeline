@@ -1,11 +1,23 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { EditorHeader } from "@/components/editor/EditorHeader";
+import { AssetLibrary } from "@/components/editor/AssetLibrary";
+import { CanvasPreview } from "@/components/editor/CanvasPreview";
+import { PropertiesPanel } from "@/components/editor/PropertiesPanel";
+import { Timeline } from "@/components/editor/Timeline";
 
 const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
+      <EditorHeader />
+      
+      <div className="flex-1 flex overflow-hidden">
+        <AssetLibrary />
+        
+        <div className="flex-1 flex flex-col">
+          <CanvasPreview />
+          <Timeline />
+        </div>
+        
+        <PropertiesPanel />
       </div>
     </div>
   );
