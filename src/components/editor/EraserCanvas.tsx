@@ -157,6 +157,12 @@ export const EraserCanvas = ({ canvasWidth, canvasHeight, onClose }: EraserCanva
   const handleApply = async () => {
     if (!canvasRef.current || !maskCanvasRef.current || !asset || !selectedClip) return;
 
+    const wasAnimatedGif = selectedClip.properties.isAnimatedGif && asset.url.toLowerCase().endsWith('.gif');
+    
+    if (wasAnimatedGif) {
+      toast.info('Nota: El GIF se convertirá en imagen estática al aplicar el borrado');
+    }
+
     try {
       toast('Aplicando borrado...');
 
@@ -235,7 +241,15 @@ export const EraserCanvas = ({ canvasWidth, canvasHeight, onClose }: EraserCanva
       };
 
       addAsset(newAsset);
-      updateClip(selectedClip.id, { assetId: newAsset.id });
+      
+      // Update clip with new asset, disable animation since it's now a static PNG
+      updateClip(selectedClip.id, { 
+        assetId: newAsset.id,
+        properties: {
+          ...selectedClip.properties,
+          isAnimatedGif: false
+        }
+      });
 
       toast.success('Borrado aplicado correctamente');
       onClose();
