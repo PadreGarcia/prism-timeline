@@ -8,18 +8,11 @@ import * as THREE from "three";
 const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded, currentClipTime }: any) => {
   const animationMixerRef = useRef<THREE.AnimationMixer | null>(null);
   const activeActionsRef = useRef<THREE.AnimationAction[]>([]);
+  const groupRef = useRef<THREE.Group>(null);
   
-  let gltf: any = null;
-  let scene: any = null;
-  let animations: any[] = [];
-  
-  try {
-    gltf = useGLTF(url) as any;
-    scene = 'scene' in gltf ? gltf.scene : null;
-    animations = gltf.animations || [];
-  } catch (error) {
-    console.error('Error loading 3D model:', error);
-  }
+  const gltf = useGLTF(url) as any;
+  const scene = gltf?.scene;
+  const animations = gltf?.animations || [];
 
   // Load animations
   useEffect(() => {
@@ -103,10 +96,16 @@ const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded, cur
 
   // Apply material properties
   useEffect(() => {
-    if (!scene) return;
+    if (!groupRef.current) return;
     
-    scene.traverse((child: any) => {
+    groupRef.current.traverse((child: any) => {
       if (child.isMesh) {
+        // Clone material to avoid affecting other instances
+        if (!child.material.userData.isCloned) {
+          child.material = child.material.clone();
+          child.material.userData.isCloned = true;
+        }
+        
         if (clip.properties?.wireframe !== undefined) {
           child.material.wireframe = clip.properties.wireframe;
         }
@@ -116,19 +115,22 @@ const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded, cur
         if (clip.properties?.roughness !== undefined) {
           child.material.roughness = clip.properties.roughness;
         }
+        child.material.needsUpdate = true;
       }
     });
-  }, [scene, clip.properties?.wireframe, clip.properties?.metalness, clip.properties?.roughness]);
+  }, [clip.properties?.wireframe, clip.properties?.metalness, clip.properties?.roughness]);
   
   if (!scene) return null;
   
   return (
-    <primitive 
-      object={scene.clone()} 
+    <group 
+      ref={groupRef}
       position={position || [0, 0, 0]}
       rotation={rotation || [0, 0, 0]}
       scale={scale || [1, 1, 1]}
-    />
+    >
+      <primitive object={scene.clone()} />
+    </group>
   );
 };
 
