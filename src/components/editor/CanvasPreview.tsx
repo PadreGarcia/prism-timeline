@@ -8,100 +8,103 @@ import * as THREE from "three";
 const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded }: any) => {
   const animationMixerRef = useRef<THREE.AnimationMixer | null>(null);
   const activeActionsRef = useRef<THREE.AnimationAction[]>([]);
-
+  
+  let gltf: any = null;
+  let scene: any = null;
+  let animations: any[] = [];
+  
   try {
-    const gltf = useGLTF(url) as any;
-    const scene = 'scene' in gltf ? gltf.scene : null;
-    const animations = gltf.animations || [];
-    
-    if (!scene) return null;
-
-    // Load animations
-    useEffect(() => {
-      if (animations && animations.length > 0 && scene) {
-        const mixer = new THREE.AnimationMixer(scene);
-        animationMixerRef.current = mixer;
-        
-        // Notify parent about available animations
-        const animNames = animations.map((anim: any) => anim.name);
-        if (onAnimationsLoaded && animNames.length > 0) {
-          onAnimationsLoaded(animNames);
-        }
-      }
-    }, [animations, scene, onAnimationsLoaded]);
-
-    // Update active animations
-    useEffect(() => {
-      if (!animationMixerRef.current || !animations || animations.length === 0) return;
-
-      // Stop all current actions
-      activeActionsRef.current.forEach(action => action.stop());
-      activeActionsRef.current = [];
-
-      // Start requested animations
-      const activeAnims = clip.properties?.animations?.active || [];
-      const speed = clip.properties?.animations?.speed || 1;
-      const loop = clip.properties?.animations?.loop !== false;
-
-      activeAnims.forEach((animName: string) => {
-        const animClip = animations.find((a: any) => a.name === animName);
-        if (animClip) {
-          const action = animationMixerRef.current!.clipAction(animClip);
-          action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
-          action.timeScale = speed;
-          action.play();
-          activeActionsRef.current.push(action);
-        }
-      });
-    }, [clip.properties?.animations, animations]);
-
-    // Update mixer on every frame
-    useEffect(() => {
-      let frameId: number;
-      const clock = new THREE.Clock();
-      
-      const animate = () => {
-        if (animationMixerRef.current) {
-          animationMixerRef.current.update(clock.getDelta());
-        }
-        frameId = requestAnimationFrame(animate);
-      };
-      
-      animate();
-      return () => cancelAnimationFrame(frameId);
-    }, []);
-
-    // Apply material properties
-    useEffect(() => {
-      if (!scene) return;
-      
-      scene.traverse((child: any) => {
-        if (child.isMesh) {
-          if (clip.properties?.wireframe !== undefined) {
-            child.material.wireframe = clip.properties.wireframe;
-          }
-          if (clip.properties?.metalness !== undefined) {
-            child.material.metalness = clip.properties.metalness;
-          }
-          if (clip.properties?.roughness !== undefined) {
-            child.material.roughness = clip.properties.roughness;
-          }
-        }
-      });
-    }, [scene, clip.properties?.wireframe, clip.properties?.metalness, clip.properties?.roughness]);
-    
-    return (
-      <primitive 
-        object={scene.clone()} 
-        position={position || [0, 0, 0]}
-        rotation={rotation || [0, 0, 0]}
-        scale={scale || [1, 1, 1]}
-      />
-    );
+    gltf = useGLTF(url) as any;
+    scene = 'scene' in gltf ? gltf.scene : null;
+    animations = gltf.animations || [];
   } catch (error) {
     console.error('Error loading 3D model:', error);
-    return null;
   }
+
+  // Load animations
+  useEffect(() => {
+    if (animations && animations.length > 0 && scene) {
+      const mixer = new THREE.AnimationMixer(scene);
+      animationMixerRef.current = mixer;
+      
+      // Notify parent about available animations
+      const animNames = animations.map((anim: any) => anim.name);
+      if (onAnimationsLoaded && animNames.length > 0) {
+        onAnimationsLoaded(animNames);
+      }
+    }
+  }, [animations, scene, onAnimationsLoaded]);
+
+  // Update active animations
+  useEffect(() => {
+    if (!animationMixerRef.current || !animations || animations.length === 0) return;
+
+    // Stop all current actions
+    activeActionsRef.current.forEach(action => action.stop());
+    activeActionsRef.current = [];
+
+    // Start requested animations
+    const activeAnims = clip.properties?.animations?.active || [];
+    const speed = clip.properties?.animations?.speed || 1;
+    const loop = clip.properties?.animations?.loop !== false;
+
+    activeAnims.forEach((animName: string) => {
+      const animClip = animations.find((a: any) => a.name === animName);
+      if (animClip) {
+        const action = animationMixerRef.current!.clipAction(animClip);
+        action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+        action.timeScale = speed;
+        action.play();
+        activeActionsRef.current.push(action);
+      }
+    });
+  }, [clip.properties?.animations, animations]);
+
+  // Update mixer on every frame
+  useEffect(() => {
+    let frameId: number;
+    const clock = new THREE.Clock();
+    
+    const animate = () => {
+      if (animationMixerRef.current) {
+        animationMixerRef.current.update(clock.getDelta());
+      }
+      frameId = requestAnimationFrame(animate);
+    };
+    
+    animate();
+    return () => cancelAnimationFrame(frameId);
+  }, []);
+
+  // Apply material properties
+  useEffect(() => {
+    if (!scene) return;
+    
+    scene.traverse((child: any) => {
+      if (child.isMesh) {
+        if (clip.properties?.wireframe !== undefined) {
+          child.material.wireframe = clip.properties.wireframe;
+        }
+        if (clip.properties?.metalness !== undefined) {
+          child.material.metalness = clip.properties.metalness;
+        }
+        if (clip.properties?.roughness !== undefined) {
+          child.material.roughness = clip.properties.roughness;
+        }
+      }
+    });
+  }, [scene, clip.properties?.wireframe, clip.properties?.metalness, clip.properties?.roughness]);
+  
+  if (!scene) return null;
+  
+  return (
+    <primitive 
+      object={scene.clone()} 
+      position={position || [0, 0, 0]}
+      rotation={rotation || [0, 0, 0]}
+      scale={scale || [1, 1, 1]}
+    />
+  );
 };
 
 export const CanvasPreview = () => {
