@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import { useEditorStore } from "@/store/editorStore";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
@@ -78,21 +78,12 @@ const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded, cur
     });
   }, [clip.properties?.animations, clip.properties?.animationKeyframes, animations, currentClipTime]);
 
-  // Update mixer on every frame
-  useEffect(() => {
-    let frameId: number;
-    const clock = new THREE.Clock();
-    
-    const animate = () => {
-      if (animationMixerRef.current) {
-        animationMixerRef.current.update(clock.getDelta());
-      }
-      frameId = requestAnimationFrame(animate);
-    };
-    
-    animate();
-    return () => cancelAnimationFrame(frameId);
-  }, []);
+  // Update mixer on every frame using useFrame
+  useFrame((state, delta) => {
+    if (animationMixerRef.current) {
+      animationMixerRef.current.update(delta);
+    }
+  });
 
   // Apply material properties
   useEffect(() => {
@@ -129,7 +120,7 @@ const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded, cur
       rotation={rotation || [0, 0, 0]}
       scale={scale || [1, 1, 1]}
     >
-      <primitive object={scene.clone()} />
+      <primitive object={scene} />
     </group>
   );
 };
