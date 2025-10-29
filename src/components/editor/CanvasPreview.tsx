@@ -3,6 +3,7 @@ import { useEditorStore } from "@/store/editorStore";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { InteractiveCanvas } from "./InteractiveCanvas";
 
 // Component to render 3D model with animations
 const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded, currentClipTime }: any) => {
@@ -407,6 +408,9 @@ export const CanvasPreview = () => {
           className="w-full h-full"
           style={{ aspectRatio: '16/9' }}
         />
+        
+        {/* Interactive controls overlay */}
+        <InteractiveCanvas canvasWidth={1920} canvasHeight={1080} />
         
         {/* Animated GIF overlay */}
         {activeGifClips.length > 0 && (
