@@ -3,12 +3,50 @@ import { Button } from "@/components/ui/button";
 import { Upload, Video, Image, Music, Box } from "lucide-react";
 import { useEditorStore } from "@/store/editorStore";
 import { toast } from "sonner";
+import { useRef } from "react";
 
 export const AssetLibrary = () => {
   const { assets, addAsset } = useEditorStore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const getAcceptedFileTypes = (type: 'video' | 'image' | 'audio' | '3d') => {
+    switch (type) {
+      case 'video': return 'video/*';
+      case 'image': return 'image/*';
+      case 'audio': return 'audio/*';
+      case '3d': return '.obj,.fbx,.glb,.gltf';
+      default: return '*';
+    }
+  };
 
   const handleFileUpload = (type: 'video' | 'image' | 'audio' | '3d') => {
-    toast.info(`Upload ${type} functionality coming soon`);
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = getAcceptedFileTypes(type);
+    input.multiple = true;
+    
+    input.onchange = (e) => {
+      const target = e.target as HTMLInputElement;
+      const files = target.files;
+      
+      if (!files || files.length === 0) return;
+      
+      Array.from(files).forEach((file) => {
+        const url = URL.createObjectURL(file);
+        const asset = {
+          id: `${type}-${Date.now()}-${Math.random()}`,
+          type: type,
+          name: file.name,
+          url: url,
+          thumbnail: type === 'image' ? url : undefined,
+        };
+        
+        addAsset(asset);
+        toast.success(`${file.name} imported successfully`);
+      });
+    };
+    
+    input.click();
   };
 
   const getIcon = (type: string) => {
