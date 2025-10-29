@@ -4,13 +4,91 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
-// Component to render 3D model
-const Model3D = ({ url, position, rotation, scale }: any) => {
+// Component to render 3D model with animations
+const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded }: any) => {
+  const animationMixerRef = useRef<THREE.AnimationMixer | null>(null);
+  const activeActionsRef = useRef<THREE.AnimationAction[]>([]);
+
   try {
-    const gltf = useGLTF(url);
+    const gltf = useGLTF(url) as any;
     const scene = 'scene' in gltf ? gltf.scene : null;
+    const animations = gltf.animations || [];
     
     if (!scene) return null;
+
+    // Load animations
+    useEffect(() => {
+      if (animations && animations.length > 0 && scene) {
+        const mixer = new THREE.AnimationMixer(scene);
+        animationMixerRef.current = mixer;
+        
+        // Notify parent about available animations
+        const animNames = animations.map((anim: any) => anim.name);
+        if (onAnimationsLoaded && animNames.length > 0) {
+          onAnimationsLoaded(animNames);
+        }
+      }
+    }, [animations, scene, onAnimationsLoaded]);
+
+    // Update active animations
+    useEffect(() => {
+      if (!animationMixerRef.current || !animations || animations.length === 0) return;
+
+      // Stop all current actions
+      activeActionsRef.current.forEach(action => action.stop());
+      activeActionsRef.current = [];
+
+      // Start requested animations
+      const activeAnims = clip.properties?.animations?.active || [];
+      const speed = clip.properties?.animations?.speed || 1;
+      const loop = clip.properties?.animations?.loop !== false;
+
+      activeAnims.forEach((animName: string) => {
+        const animClip = animations.find((a: any) => a.name === animName);
+        if (animClip) {
+          const action = animationMixerRef.current!.clipAction(animClip);
+          action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+          action.timeScale = speed;
+          action.play();
+          activeActionsRef.current.push(action);
+        }
+      });
+    }, [clip.properties?.animations, animations]);
+
+    // Update mixer on every frame
+    useEffect(() => {
+      let frameId: number;
+      const clock = new THREE.Clock();
+      
+      const animate = () => {
+        if (animationMixerRef.current) {
+          animationMixerRef.current.update(clock.getDelta());
+        }
+        frameId = requestAnimationFrame(animate);
+      };
+      
+      animate();
+      return () => cancelAnimationFrame(frameId);
+    }, []);
+
+    // Apply material properties
+    useEffect(() => {
+      if (!scene) return;
+      
+      scene.traverse((child: any) => {
+        if (child.isMesh) {
+          if (clip.properties?.wireframe !== undefined) {
+            child.material.wireframe = clip.properties.wireframe;
+          }
+          if (clip.properties?.metalness !== undefined) {
+            child.material.metalness = clip.properties.metalness;
+          }
+          if (clip.properties?.roughness !== undefined) {
+            child.material.roughness = clip.properties.roughness;
+          }
+        }
+      });
+    }, [scene, clip.properties?.wireframe, clip.properties?.metalness, clip.properties?.roughness]);
     
     return (
       <primitive 
@@ -34,7 +112,25 @@ export const CanvasPreview = () => {
   const [mediaLoaded, setMediaLoaded] = useState<Set<string>>(new Set());
   const [active3DClips, setActive3DClips] = useState<any[]>([]);
   
-  const { currentTime, tracks, assets, isPlaying } = useEditorStore();
+  const { currentTime, tracks, assets, isPlaying, updateClip } = useEditorStore();
+
+  // Handle animations loaded from 3D models
+  const handleAnimationsLoaded = (clipId: string, animationNames: string[]) => {
+    const clip = tracks.flatMap(t => t.clips).find(c => c.id === clipId);
+    if (clip && (!clip.properties.animations || !clip.properties.animations.available)) {
+      updateClip(clipId, {
+        properties: {
+          ...clip.properties,
+          animations: {
+            available: animationNames,
+            active: [],
+            speed: 1,
+            loop: true,
+          }
+        }
+      });
+    }
+  };
 
   // Load media elements
   useEffect(() => {
@@ -264,10 +360,12 @@ export const CanvasPreview = () => {
                 return (
                   <Model3D
                     key={clip.id}
+                    clip={clip}
                     url={asset.url}
                     position={[pos.x / 200, pos.y / 200, pos.z || 0]}
                     rotation={[rot.x, rot.y, rot.z]}
                     scale={[scl.x, scl.y, scl.z || 1]}
+                    onAnimationsLoaded={(names: string[]) => handleAnimationsLoaded(clip.id, names)}
                   />
                 );
               })}

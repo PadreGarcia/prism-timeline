@@ -2,15 +2,22 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useEditorStore } from "@/store/editorStore";
-import { Settings } from "lucide-react";
+import { Settings, Play, Pause, Box, Zap } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export const PropertiesPanel = () => {
-  const { selectedClipId, tracks, updateClip } = useEditorStore();
+  const { selectedClipId, tracks, updateClip, assets } = useEditorStore();
 
   const selectedClip = tracks
     .flatMap(track => track.clips)
     .find(clip => clip.id === selectedClipId);
+
+  const asset = selectedClip ? assets.find(a => a.id === selectedClip.assetId) : null;
+  const is3D = asset?.type === '3d';
 
   if (!selectedClip) {
     return (
@@ -39,110 +46,289 @@ export const PropertiesPanel = () => {
     });
   };
 
+  const toggleAnimation = (animationName: string) => {
+    if (!selectedClip) return;
+    const current = selectedClip.properties.animations?.active || [];
+    const newActive = current.includes(animationName)
+      ? current.filter(name => name !== animationName)
+      : [...current, animationName];
+    
+    handlePropertyChange('animations', {
+      ...selectedClip.properties.animations,
+      active: newActive,
+    });
+  };
+
   return (
     <div className="w-80 bg-panel-content border-l border-border flex flex-col">
       <div className="p-4 bg-panel-header border-b border-border">
         <h2 className="font-semibold text-foreground">Properties</h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        <Card className="p-4 space-y-4">
-          <h3 className="font-medium text-sm">Transform</h3>
-          
-          <div className="space-y-2">
-            <Label className="text-xs">Position X</Label>
-            <Input
-              type="number"
-              value={selectedClip.properties.position?.x || 0}
-              onChange={(e) => handlePropertyChange('position', { 
-                ...selectedClip.properties.position, 
-                x: parseFloat(e.target.value) 
-              })}
-              className="h-8"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs">Position Y</Label>
-            <Input
-              type="number"
-              value={selectedClip.properties.position?.y || 0}
-              onChange={(e) => handlePropertyChange('position', { 
-                ...selectedClip.properties.position, 
-                y: parseFloat(e.target.value) 
-              })}
-              className="h-8"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs">Scale</Label>
-            <Slider
-              value={[selectedClip.properties.scale?.x || 1]}
-              min={0.1}
-              max={3}
-              step={0.1}
-              onValueChange={(value) => handlePropertyChange('scale', { 
-                x: value[0], 
-                y: value[0], 
-                z: value[0] 
-              })}
-            />
-          </div>
-        </Card>
-
-        <Card className="p-4 space-y-4">
-          <h3 className="font-medium text-sm">Effects</h3>
-          
-          <div className="space-y-2">
-            <Label className="text-xs">Opacity</Label>
-            <Slider
-              value={[selectedClip.properties.opacity || 1]}
-              min={0}
-              max={1}
-              step={0.01}
-              onValueChange={(value) => handlePropertyChange('opacity', value[0])}
-            />
-          </div>
-
-          {selectedClip.properties.volume !== undefined && (
+      <ScrollArea className="flex-1 p-4">
+        <div className="space-y-4">
+          <Card className="p-4 space-y-4">
+            <h3 className="font-medium text-sm flex items-center gap-2">
+              <Box className="h-4 w-4" />
+              Transform
+            </h3>
+            
             <div className="space-y-2">
-              <Label className="text-xs">Volume</Label>
+              <Label className="text-xs">Position X</Label>
+              <Input
+                type="number"
+                value={selectedClip.properties.position?.x || 0}
+                onChange={(e) => handlePropertyChange('position', { 
+                  ...selectedClip.properties.position, 
+                  x: parseFloat(e.target.value) 
+                })}
+                className="h-8"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs">Position Y</Label>
+              <Input
+                type="number"
+                value={selectedClip.properties.position?.y || 0}
+                onChange={(e) => handlePropertyChange('position', { 
+                  ...selectedClip.properties.position, 
+                  y: parseFloat(e.target.value) 
+                })}
+                className="h-8"
+              />
+            </div>
+
+            {is3D && (
+              <div className="space-y-2">
+                <Label className="text-xs">Position Z</Label>
+                <Input
+                  type="number"
+                  value={selectedClip.properties.position?.z || 0}
+                  onChange={(e) => handlePropertyChange('position', { 
+                    ...selectedClip.properties.position, 
+                    z: parseFloat(e.target.value) 
+                  })}
+                  className="h-8"
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label className="text-xs">Scale</Label>
               <Slider
-                value={[selectedClip.properties.volume || 1]}
+                value={[selectedClip.properties.scale?.x || 1]}
+                min={0.1}
+                max={3}
+                step={0.1}
+                onValueChange={(value) => handlePropertyChange('scale', { 
+                  x: value[0], 
+                  y: value[0], 
+                  z: value[0] 
+                })}
+              />
+              <span className="text-xs text-muted-foreground">{selectedClip.properties.scale?.x?.toFixed(2) || '1.00'}</span>
+            </div>
+
+            {is3D && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-xs">Rotation X</Label>
+                  <Slider
+                    value={[selectedClip.properties.rotation?.x || 0]}
+                    min={-Math.PI}
+                    max={Math.PI}
+                    step={0.01}
+                    onValueChange={(value) => handlePropertyChange('rotation', { 
+                      ...selectedClip.properties.rotation,
+                      x: value[0]
+                    })}
+                  />
+                  <span className="text-xs text-muted-foreground">{(selectedClip.properties.rotation?.x || 0).toFixed(2)}</span>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Rotation Y</Label>
+                  <Slider
+                    value={[selectedClip.properties.rotation?.y || 0]}
+                    min={-Math.PI}
+                    max={Math.PI}
+                    step={0.01}
+                    onValueChange={(value) => handlePropertyChange('rotation', { 
+                      ...selectedClip.properties.rotation,
+                      y: value[0]
+                    })}
+                  />
+                  <span className="text-xs text-muted-foreground">{(selectedClip.properties.rotation?.y || 0).toFixed(2)}</span>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Rotation Z</Label>
+                  <Slider
+                    value={[selectedClip.properties.rotation?.z || 0]}
+                    min={-Math.PI}
+                    max={Math.PI}
+                    step={0.01}
+                    onValueChange={(value) => handlePropertyChange('rotation', { 
+                      ...selectedClip.properties.rotation,
+                      z: value[0]
+                    })}
+                  />
+                  <span className="text-xs text-muted-foreground">{(selectedClip.properties.rotation?.z || 0).toFixed(2)}</span>
+                </div>
+              </>
+            )}
+          </Card>
+
+          {is3D && selectedClip.properties.animations?.available && selectedClip.properties.animations.available.length > 0 && (
+            <Card className="p-4 space-y-4">
+              <h3 className="font-medium text-sm flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                Animations
+              </h3>
+              
+              <div className="space-y-2">
+                <Label className="text-xs">Available Animations</Label>
+                <div className="flex flex-wrap gap-2">
+                  {selectedClip.properties.animations.available.map((anim) => {
+                    const isActive = selectedClip.properties.animations?.active?.includes(anim);
+                    return (
+                      <Button
+                        key={anim}
+                        size="sm"
+                        variant={isActive ? "default" : "outline"}
+                        onClick={() => toggleAnimation(anim)}
+                        className="h-8"
+                      >
+                        {isActive ? <Pause className="h-3 w-3 mr-1" /> : <Play className="h-3 w-3 mr-1" />}
+                        {anim}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs">Animation Speed</Label>
+                <Slider
+                  value={[selectedClip.properties.animations?.speed || 1]}
+                  min={0.1}
+                  max={3}
+                  step={0.1}
+                  onValueChange={(value) => handlePropertyChange('animations', {
+                    ...selectedClip.properties.animations,
+                    speed: value[0]
+                  })}
+                />
+                <span className="text-xs text-muted-foreground">{selectedClip.properties.animations?.speed?.toFixed(1) || '1.0'}x</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Loop Animations</Label>
+                <Switch
+                  checked={selectedClip.properties.animations?.loop !== false}
+                  onCheckedChange={(checked) => handlePropertyChange('animations', {
+                    ...selectedClip.properties.animations,
+                    loop: checked
+                  })}
+                />
+              </div>
+            </Card>
+          )}
+
+          {is3D && (
+            <Card className="p-4 space-y-4">
+              <h3 className="font-medium text-sm">3D Material</h3>
+              
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Wireframe Mode</Label>
+                <Switch
+                  checked={selectedClip.properties.wireframe || false}
+                  onCheckedChange={(checked) => handlePropertyChange('wireframe', checked)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs">Metalness</Label>
+                <Slider
+                  value={[selectedClip.properties.metalness ?? 0]}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  onValueChange={(value) => handlePropertyChange('metalness', value[0])}
+                />
+                <span className="text-xs text-muted-foreground">{(selectedClip.properties.metalness ?? 0).toFixed(2)}</span>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs">Roughness</Label>
+                <Slider
+                  value={[selectedClip.properties.roughness ?? 1]}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  onValueChange={(value) => handlePropertyChange('roughness', value[0])}
+                />
+                <span className="text-xs text-muted-foreground">{(selectedClip.properties.roughness ?? 1).toFixed(2)}</span>
+              </div>
+            </Card>
+          )}
+
+          <Card className="p-4 space-y-4">
+            <h3 className="font-medium text-sm">Effects</h3>
+            
+            <div className="space-y-2">
+              <Label className="text-xs">Opacity</Label>
+              <Slider
+                value={[selectedClip.properties.opacity || 1]}
                 min={0}
                 max={1}
                 step={0.01}
-                onValueChange={(value) => handlePropertyChange('volume', value[0])}
+                onValueChange={(value) => handlePropertyChange('opacity', value[0])}
+              />
+              <span className="text-xs text-muted-foreground">{(selectedClip.properties.opacity || 1).toFixed(2)}</span>
+            </div>
+
+            {selectedClip.properties.volume !== undefined && (
+              <div className="space-y-2">
+                <Label className="text-xs">Volume</Label>
+                <Slider
+                  value={[selectedClip.properties.volume || 1]}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  onValueChange={(value) => handlePropertyChange('volume', value[0])}
+                />
+                <span className="text-xs text-muted-foreground">{(selectedClip.properties.volume || 1).toFixed(2)}</span>
+              </div>
+            )}
+          </Card>
+
+          <Card className="p-4 space-y-4">
+            <h3 className="font-medium text-sm">Timing</h3>
+            
+            <div className="space-y-2">
+              <Label className="text-xs">Start Time</Label>
+              <Input
+                type="text"
+                value={`${selectedClip.startTime.toFixed(2)}s`}
+                readOnly
+                className="h-8"
               />
             </div>
-          )}
-        </Card>
 
-        <Card className="p-4 space-y-4">
-          <h3 className="font-medium text-sm">Timing</h3>
-          
-          <div className="space-y-2">
-            <Label className="text-xs">Start Time</Label>
-            <Input
-              type="number"
-              value={selectedClip.startTime.toFixed(2)}
-              readOnly
-              className="h-8"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs">Duration</Label>
-            <Input
-              type="number"
-              value={selectedClip.duration.toFixed(2)}
-              readOnly
-              className="h-8"
-            />
-          </div>
-        </Card>
-      </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Duration</Label>
+              <Input
+                type="text"
+                value={`${selectedClip.duration.toFixed(2)}s`}
+                readOnly
+                className="h-8"
+              />
+            </div>
+          </Card>
+        </div>
+      </ScrollArea>
     </div>
   );
 };

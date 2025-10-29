@@ -23,6 +23,16 @@ export interface TimelineClip {
     scale?: { x: number; y: number; z?: number };
     opacity?: number;
     volume?: number;
+    // 3D specific properties
+    animations?: {
+      available: string[];
+      active: string[];
+      speed: number;
+      loop: boolean;
+    };
+    wireframe?: boolean;
+    metalness?: number;
+    roughness?: number;
   };
 }
 
