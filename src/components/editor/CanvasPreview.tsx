@@ -341,8 +341,8 @@ export const CanvasPreview = () => {
       } else if (asset.type === 'image') {
         const img = imageRefs.current.get(asset.id);
         if (img && img.complete && img.naturalWidth > 0) {
-          const width = img.width * scale.x;
-          const height = img.height * scale.y;
+          const width = img.naturalWidth * scale.x;
+          const height = img.naturalHeight * scale.y;
           
           ctx.drawImage(
             img,

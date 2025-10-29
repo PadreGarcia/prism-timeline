@@ -13,7 +13,7 @@ export const AssetLibrary = () => {
   const handleFileImport = () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'video/*,image/*,audio/*,.obj,.fbx,.glb,.gltf';
+    input.accept = 'video/*,image/*,image/gif,audio/*,.obj,.fbx,.glb,.gltf';
     input.multiple = true;
     
     input.onchange = (e) => {
@@ -30,7 +30,7 @@ export const AssetLibrary = () => {
         
         if (fileType.startsWith('video/')) {
           assetType = 'video';
-        } else if (fileType.startsWith('image/')) {
+        } else if (fileType.startsWith('image/') || fileType === 'image/gif') {
           assetType = 'image';
         } else if (fileType.startsWith('audio/')) {
           assetType = 'audio';
@@ -109,7 +109,7 @@ export const AssetLibrary = () => {
       
       if (fileType.startsWith('video/')) {
         assetType = 'video';
-      } else if (fileType.startsWith('image/')) {
+      } else if (fileType.startsWith('image/') || fileType === 'image/gif') {
         assetType = 'image';
       } else if (fileType.startsWith('audio/')) {
         assetType = 'audio';

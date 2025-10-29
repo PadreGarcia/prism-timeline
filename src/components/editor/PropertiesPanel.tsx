@@ -6,12 +6,16 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useEditorStore } from "@/store/editorStore";
-import { Settings, Play, Pause, Box, Zap, Plus, Trash2 } from "lucide-react";
+import { Settings, Play, Pause, Box, Zap, Plus, Trash2, Scissors } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { removeBackgroundFromImage, loadImage } from "@/lib/gifProcessor";
+import { toast } from "sonner";
+import { useState } from "react";
 
 export const PropertiesPanel = () => {
-  const { selectedClipId, tracks, updateClip, assets, currentTime } = useEditorStore();
+  const { selectedClipId, tracks, updateClip, assets, currentTime, addAsset } = useEditorStore();
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
 
   const selectedClip = tracks
     .flatMap(track => track.clips)
@@ -19,6 +23,37 @@ export const PropertiesPanel = () => {
 
   const asset = selectedClip ? assets.find(a => a.id === selectedClip.assetId) : null;
   const is3D = asset?.type === '3d';
+  const isImage = asset?.type === 'image';
+
+  const handleRemoveBackground = async () => {
+    if (!asset || !isImage) return;
+    
+    setIsRemovingBg(true);
+    toast.info("Procesando... Esto puede tomar unos segundos");
+    
+    try {
+      const img = await loadImage(asset.url);
+      const resultBlob = await removeBackgroundFromImage(img);
+      const newUrl = URL.createObjectURL(resultBlob);
+      
+      // Create new asset with removed background
+      const newAsset = {
+        id: `image-${Date.now()}-${Math.random()}`,
+        type: 'image' as const,
+        name: `${asset.name.replace(/\.[^/.]+$/, '')}_no_bg.png`,
+        url: newUrl,
+        thumbnail: newUrl,
+      };
+      
+      addAsset(newAsset);
+      toast.success("¡Fondo removido! Nuevo asset agregado a la biblioteca");
+    } catch (error) {
+      console.error('Error removing background:', error);
+      toast.error("Error al remover el fondo. Intenta con otra imagen.");
+    } finally {
+      setIsRemovingBg(false);
+    }
+  };
 
   if (!selectedClip) {
     return (
@@ -439,6 +474,35 @@ export const PropertiesPanel = () => {
                 />
                 <span className="text-xs text-muted-foreground">{(selectedClip.properties.roughness ?? 1).toFixed(2)}</span>
               </div>
+            </Card>
+          )}
+
+          {isImage && (
+            <Card className="p-4 space-y-4">
+              <h3 className="font-medium text-sm flex items-center gap-2">
+                <Scissors className="h-4 w-4" />
+                Background Removal
+              </h3>
+              
+              <Button
+                onClick={handleRemoveBackground}
+                disabled={isRemovingBg}
+                variant="outline"
+                className="w-full"
+              >
+                {isRemovingBg ? (
+                  <>Procesando...</>
+                ) : (
+                  <>
+                    <Scissors className="h-4 w-4 mr-2" />
+                    Remover Fondo
+                  </>
+                )}
+              </Button>
+              
+              <p className="text-xs text-muted-foreground">
+                Usa IA para remover el fondo de esta imagen. El resultado se guardará como un nuevo asset.
+              </p>
             </Card>
           )}
 
