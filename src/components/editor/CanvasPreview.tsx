@@ -20,6 +20,14 @@ const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded, cur
     if (!originalScene) return;
     
     const cloned = originalScene.clone();
+    
+    // Center the model by calculating its bounding box
+    const box = new THREE.Box3().setFromObject(cloned);
+    const center = box.getCenter(new THREE.Vector3());
+    
+    // Offset the entire model to center it at origin
+    cloned.position.set(-center.x, -center.y, -center.z);
+    
     setClonedScene(cloned);
     
     // Create mixer on the cloned scene
