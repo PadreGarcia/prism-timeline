@@ -13,6 +13,10 @@ export const Timeline = () => {
     time: number;
     assetName: string;
   } | null>(null);
+  const [draggingKeyframe, setDraggingKeyframe] = useState<{
+    clipId: string;
+    keyframeIndex: number;
+  } | null>(null);
   
   const { 
     tracks, 
@@ -24,6 +28,7 @@ export const Timeline = () => {
     selectClip,
     selectedClipId,
     addClipToTrack,
+    updateClip,
     assets
   } = useEditorStore();
 
@@ -161,6 +166,45 @@ export const Timeline = () => {
           displayName = clipName.substring(0, 15) + '...';
         }
         ctx.fillText(displayName, clipX + 6, clipY + 15);
+
+        // Draw animation keyframes as yellow markers
+        if (clip.properties.animationKeyframes && clip.properties.animationKeyframes.length > 0) {
+          clip.properties.animationKeyframes.forEach((keyframe: any) => {
+            const keyframeX = clipX + (keyframe.time * pixelsPerSecond);
+            const keyframeY = clipY + clipHeight / 2;
+            
+            // Yellow diamond/rhombus shape
+            ctx.save();
+            ctx.translate(keyframeX, keyframeY);
+            ctx.rotate(Math.PI / 4); // Rotate 45 degrees
+            
+            // Shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(-6, -6, 12, 12);
+            
+            // Yellow keyframe
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillRect(-5, -5, 10, 10);
+            
+            // Border
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-5, -5, 10, 10);
+            
+            ctx.restore();
+            
+            // Animation name label
+            if (keyframe.activeAnimations && keyframe.activeAnimations.length > 0) {
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+              ctx.fillRect(keyframeX - 30, clipY + 20, 60, 14);
+              
+              ctx.fillStyle = '#fbbf24';
+              ctx.font = '9px sans-serif';
+              ctx.textAlign = 'center';
+              ctx.fillText(keyframe.activeAnimations[0].substring(0, 8), keyframeX, clipY + 30);
+            }
+          });
+        }
       });
 
       currentY += trackHeight;
@@ -233,7 +277,7 @@ export const Timeline = () => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // Check if clicked on a clip
+    // Check if clicked on a keyframe first
     const rulerHeight = 30;
     const trackHeight = 60;
     let currentY = rulerHeight;
@@ -245,6 +289,23 @@ export const Timeline = () => {
         const clipY = currentY + 8;
         const clipHeight = trackHeight - 16;
 
+        // Check keyframes
+        if (clip.properties.animationKeyframes) {
+          for (let i = 0; i < clip.properties.animationKeyframes.length; i++) {
+            const keyframe = clip.properties.animationKeyframes[i];
+            const keyframeX = clipX + (keyframe.time * pixelsPerSecond);
+            const keyframeY = clipY + clipHeight / 2;
+            
+            // Check if click is near keyframe (hit area)
+            const distance = Math.sqrt(Math.pow(x - keyframeX, 2) + Math.pow(y - keyframeY, 2));
+            if (distance < 10) {
+              selectClip(clip.id);
+              return;
+            }
+          }
+        }
+
+        // Check if clicked on clip
         if (
           x >= clipX &&
           x <= clipX + clipWidth &&
@@ -262,6 +323,76 @@ export const Timeline = () => {
     const newTime = Math.max(0, Math.min(x / pixelsPerSecond, duration));
     setCurrentTime(newTime);
     selectClip(null);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const rulerHeight = 30;
+    const trackHeight = 60;
+    let currentY = rulerHeight;
+
+    // Check if mouse down on a keyframe
+    for (const track of tracks) {
+      for (const clip of track.clips) {
+        const clipX = clip.startTime * pixelsPerSecond;
+        const clipY = currentY + 8;
+        const clipHeight = trackHeight - 16;
+
+        if (clip.properties.animationKeyframes) {
+          for (let i = 0; i < clip.properties.animationKeyframes.length; i++) {
+            const keyframe = clip.properties.animationKeyframes[i];
+            const keyframeX = clipX + (keyframe.time * pixelsPerSecond);
+            const keyframeY = clipY + clipHeight / 2;
+            
+            const distance = Math.sqrt(Math.pow(x - keyframeX, 2) + Math.pow(y - keyframeY, 2));
+            if (distance < 10) {
+              setDraggingKeyframe({ clipId: clip.id, keyframeIndex: i });
+              selectClip(clip.id);
+              return;
+            }
+          }
+        }
+      }
+      currentY += trackHeight;
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!draggingKeyframe) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+
+    // Find the clip
+    const clip = tracks.flatMap(t => t.clips).find(c => c.id === draggingKeyframe.clipId);
+    if (!clip) return;
+
+    const clipX = clip.startTime * pixelsPerSecond;
+    const relativeX = x - clipX;
+    const newTime = Math.max(0, Math.min(relativeX / pixelsPerSecond, clip.duration));
+
+    const keyframes = [...(clip.properties.animationKeyframes || [])];
+    keyframes[draggingKeyframe.keyframeIndex].time = newTime;
+
+    updateClip(clip.id, {
+      properties: {
+        ...clip.properties,
+        animationKeyframes: keyframes.sort((a, b) => a.time - b.time),
+      },
+    });
+  };
+
+  const handleMouseUp = () => {
+    setDraggingKeyframe(null);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLCanvasElement>) => {
@@ -455,8 +586,12 @@ export const Timeline = () => {
             ref={canvasRef}
             className={`w-full h-full cursor-pointer transition-all ${
               isDraggingOver ? 'ring-2 ring-primary ring-inset' : ''
-            }`}
+            } ${draggingKeyframe ? 'cursor-grabbing' : 'cursor-pointer'}`}
             onClick={handleCanvasClick}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}

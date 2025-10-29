@@ -49,14 +49,13 @@ export const PropertiesPanel = () => {
 
   const toggleAnimation = (animationName: string) => {
     if (!selectedClip) return;
+    // Only one animation can be active at a time
     const current = selectedClip.properties.animations?.active || [];
-    const newActive = current.includes(animationName)
-      ? current.filter(name => name !== animationName)
-      : [...current, animationName];
+    const isCurrentlyActive = current.includes(animationName);
     
     handlePropertyChange('animations', {
       ...selectedClip.properties.animations,
-      active: newActive,
+      active: isCurrentlyActive ? [] : [animationName],
     });
   };
 
@@ -189,7 +188,7 @@ export const PropertiesPanel = () => {
               </h3>
               
               <div className="space-y-2">
-                <Label className="text-xs">Available Animations</Label>
+                <Label className="text-xs">Available Animations (Select One)</Label>
                 <div className="flex flex-wrap gap-2">
                   {selectedClip.properties.animations.available.map((anim) => {
                     const isActive = selectedClip.properties.animations?.active?.includes(anim);
@@ -252,7 +251,7 @@ export const PropertiesPanel = () => {
                     const relativeTime = Math.max(0, Math.min(currentTime - selectedClip.startTime, selectedClip.duration));
                     const newKeyframe = {
                       time: relativeTime,
-                      activeAnimations: selectedClip.properties.animations?.active || [],
+                      activeAnimations: selectedClip.properties.animations?.active?.[0] ? [selectedClip.properties.animations.active[0]] : [],
                       speed: selectedClip.properties.animations?.speed || 1,
                       loop: selectedClip.properties.animations?.loop !== false,
                     };
@@ -302,9 +301,31 @@ export const PropertiesPanel = () => {
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs">Time (seconds)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={selectedClip.duration}
+                        step={0.1}
+                        value={keyframe.time}
+                        onChange={(e) => {
+                          const keyframes = [...(selectedClip.properties.animationKeyframes || [])];
+                          keyframes[index].time = Math.max(0, Math.min(parseFloat(e.target.value) || 0, selectedClip.duration));
+                          updateClip(selectedClipId, {
+                            properties: {
+                              ...selectedClip.properties,
+                              animationKeyframes: keyframes.sort((a, b) => a.time - b.time),
+                            },
+                          });
+                        }}
+                        className="h-8"
+                      />
+                    </div>
                     
                     <div className="space-y-1">
-                      <Label className="text-xs font-medium">Active Animations</Label>
+                      <Label className="text-xs font-medium">Animation</Label>
                       <div className="space-y-1">
                         {selectedClip.properties.animations!.available.map((animName: string) => (
                           <div key={animName} className="flex items-center space-x-2">
@@ -313,13 +334,8 @@ export const PropertiesPanel = () => {
                               checked={keyframe.activeAnimations.includes(animName)}
                               onCheckedChange={(checked) => {
                                 const keyframes = [...(selectedClip.properties.animationKeyframes || [])];
-                                if (checked) {
-                                  keyframes[index].activeAnimations.push(animName);
-                                } else {
-                                  keyframes[index].activeAnimations = keyframes[index].activeAnimations.filter(
-                                    (a: string) => a !== animName
-                                  );
-                                }
+                                // Only one animation at a time
+                                keyframes[index].activeAnimations = checked ? [animName] : [];
                                 updateClip(selectedClipId, {
                                   properties: {
                                     ...selectedClip.properties,
