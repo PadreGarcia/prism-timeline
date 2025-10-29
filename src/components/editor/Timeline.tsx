@@ -17,6 +17,12 @@ export const Timeline = () => {
     clipId: string;
     keyframeIndex: number;
   } | null>(null);
+  const [resizingClip, setResizingClip] = useState<{
+    clipId: string;
+    edge: 'left' | 'right';
+    originalStartTime: number;
+    originalDuration: number;
+  } | null>(null);
   
   const { 
     tracks, 
@@ -149,6 +155,22 @@ export const Timeline = () => {
         ctx.strokeStyle = isSelected ? '#6cc3e8' : '#4aaed9';
         ctx.lineWidth = isSelected ? 3 : 2;
         ctx.strokeRect(clipX, clipY, clipWidth, clipHeight);
+
+        // Resize handles on edges (only for selected clip)
+        if (isSelected) {
+          const handleWidth = 8;
+          
+          // Left handle
+          ctx.fillStyle = '#fbbf24';
+          ctx.fillRect(clipX - handleWidth / 2, clipY, handleWidth, clipHeight);
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(clipX - handleWidth / 2, clipY, handleWidth, clipHeight);
+          
+          // Right handle
+          ctx.fillRect(clipX + clipWidth - handleWidth / 2, clipY, handleWidth, clipHeight);
+          ctx.strokeRect(clipX + clipWidth - handleWidth / 2, clipY, handleWidth, clipHeight);
+        }
 
         // Clip name with background
         const asset = assets.find(a => a.id === clip.assetId);
@@ -337,6 +359,57 @@ export const Timeline = () => {
     const trackHeight = 60;
     let currentY = rulerHeight;
 
+    // Check if mouse down on a resize handle first (for selected clip)
+    if (selectedClipId) {
+      for (const track of tracks) {
+        for (const clip of track.clips) {
+          if (clip.id !== selectedClipId) continue;
+          
+          const clipX = clip.startTime * pixelsPerSecond;
+          const clipWidth = clip.duration * pixelsPerSecond;
+          const clipY = currentY + 8;
+          const clipHeight = trackHeight - 16;
+
+          const handleWidth = 8;
+          const tolerance = 5;
+
+          // Check left handle
+          if (
+            y >= clipY && y <= clipY + clipHeight &&
+            x >= clipX - handleWidth / 2 - tolerance && 
+            x <= clipX + handleWidth / 2 + tolerance
+          ) {
+            setResizingClip({
+              clipId: clip.id,
+              edge: 'left',
+              originalStartTime: clip.startTime,
+              originalDuration: clip.duration,
+            });
+            return;
+          }
+
+          // Check right handle
+          if (
+            y >= clipY && y <= clipY + clipHeight &&
+            x >= clipX + clipWidth - handleWidth / 2 - tolerance && 
+            x <= clipX + clipWidth + handleWidth / 2 + tolerance
+          ) {
+            setResizingClip({
+              clipId: clip.id,
+              edge: 'right',
+              originalStartTime: clip.startTime,
+              originalDuration: clip.duration,
+            });
+            return;
+          }
+        }
+        currentY += trackHeight;
+      }
+    }
+
+    // Reset for keyframe check
+    currentY = rulerHeight;
+
     // Check if mouse down on a keyframe
     for (const track of tracks) {
       for (const clip of track.clips) {
@@ -364,35 +437,72 @@ export const Timeline = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!draggingKeyframe) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
 
-    // Find the clip
-    const clip = tracks.flatMap(t => t.clips).find(c => c.id === draggingKeyframe.clipId);
-    if (!clip) return;
+    // Handle clip resizing
+    if (resizingClip) {
+      const clip = tracks.flatMap(t => t.clips).find(c => c.id === resizingClip.clipId);
+      if (!clip) return;
 
-    const clipX = clip.startTime * pixelsPerSecond;
-    const relativeX = x - clipX;
-    const newTime = Math.max(0, Math.min(relativeX / pixelsPerSecond, clip.duration));
+      const asset = assets.find(a => a.id === clip.assetId);
+      const newTime = x / pixelsPerSecond;
 
-    const keyframes = [...(clip.properties.animationKeyframes || [])];
-    keyframes[draggingKeyframe.keyframeIndex].time = newTime;
+      if (resizingClip.edge === 'left') {
+        // Resizing from left edge (changing start time and duration)
+        const maxStartTime = resizingClip.originalStartTime + resizingClip.originalDuration - 0.1;
+        const newStartTime = Math.max(0, Math.min(newTime, maxStartTime));
+        const newDuration = resizingClip.originalStartTime + resizingClip.originalDuration - newStartTime;
 
-    updateClip(clip.id, {
-      properties: {
-        ...clip.properties,
-        animationKeyframes: keyframes.sort((a, b) => a.time - b.time),
-      },
-    });
+        updateClip(clip.id, {
+          startTime: newStartTime,
+          duration: Math.max(0.1, newDuration),
+        });
+      } else {
+        // Resizing from right edge (changing duration only)
+        let newDuration = newTime - clip.startTime;
+        newDuration = Math.max(0.1, newDuration);
+
+        // Limit duration for video and audio to their actual duration
+        if (asset && (asset.type === 'video' || asset.type === 'audio')) {
+          const maxDuration = asset.duration || 10;
+          newDuration = Math.min(newDuration, maxDuration);
+        }
+
+        updateClip(clip.id, {
+          duration: newDuration,
+        });
+      }
+      return;
+    }
+
+    // Handle keyframe dragging
+    if (draggingKeyframe) {
+      const clip = tracks.flatMap(t => t.clips).find(c => c.id === draggingKeyframe.clipId);
+      if (!clip) return;
+
+      const clipX = clip.startTime * pixelsPerSecond;
+      const relativeX = x - clipX;
+      const newTime = Math.max(0, Math.min(relativeX / pixelsPerSecond, clip.duration));
+
+      const keyframes = [...(clip.properties.animationKeyframes || [])];
+      keyframes[draggingKeyframe.keyframeIndex].time = newTime;
+
+      updateClip(clip.id, {
+        properties: {
+          ...clip.properties,
+          animationKeyframes: keyframes.sort((a, b) => a.time - b.time),
+        },
+      });
+    }
   };
 
   const handleMouseUp = () => {
     setDraggingKeyframe(null);
+    setResizingClip(null);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLCanvasElement>) => {
@@ -584,9 +694,15 @@ export const Timeline = () => {
         >
           <canvas
             ref={canvasRef}
-            className={`w-full h-full cursor-pointer transition-all ${
+            className={`w-full h-full transition-all ${
               isDraggingOver ? 'ring-2 ring-primary ring-inset' : ''
-            } ${draggingKeyframe ? 'cursor-grabbing' : 'cursor-pointer'}`}
+            } ${
+              resizingClip 
+                ? 'cursor-ew-resize' 
+                : draggingKeyframe 
+                  ? 'cursor-grabbing' 
+                  : 'cursor-pointer'
+            }`}
             onClick={handleCanvasClick}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
