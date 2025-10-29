@@ -6,16 +6,18 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useEditorStore } from "@/store/editorStore";
-import { Settings, Play, Pause, Box, Zap, Plus, Trash2, Scissors } from "lucide-react";
+import { Settings, Play, Pause, Box, Zap, Plus, Trash2, Scissors, Eraser } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { removeBackgroundFromImage, loadImage } from "@/lib/gifProcessor";
 import { toast } from "sonner";
 import { useState } from "react";
+import { EraserCanvas } from "./EraserCanvas";
 
 export const PropertiesPanel = () => {
   const { selectedClipId, tracks, updateClip, assets, currentTime, addAsset } = useEditorStore();
   const [isRemovingBg, setIsRemovingBg] = useState(false);
+  const [showEraser, setShowEraser] = useState(false);
 
   const selectedClip = tracks
     .flatMap(track => track.clips)
@@ -524,6 +526,19 @@ export const PropertiesPanel = () => {
               <p className="text-xs text-muted-foreground">
                 Usa IA para remover el fondo de esta imagen. El resultado se guardará como un nuevo asset.
               </p>
+              
+              <Button
+                onClick={() => setShowEraser(true)}
+                variant="outline"
+                className="w-full"
+              >
+                <Eraser className="h-4 w-4 mr-2" />
+                Borrador Inteligente
+              </Button>
+              
+              <p className="text-xs text-muted-foreground">
+                Pinta sobre las áreas que quieres eliminar. Perfecto para borrar detalles específicos.
+              </p>
             </Card>
           )}
 
@@ -582,6 +597,14 @@ export const PropertiesPanel = () => {
           </Card>
         </div>
       </ScrollArea>
+      
+      {showEraser && isImage && (
+        <EraserCanvas 
+          canvasWidth={1920}
+          canvasHeight={1080}
+          onClose={() => setShowEraser(false)}
+        />
+      )}
     </div>
   );
 };
