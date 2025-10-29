@@ -1,9 +1,54 @@
 import { Button } from "@/components/ui/button";
 import { Play, Pause, SkipBack, SkipForward, Download, Save } from "lucide-react";
 import { useEditorStore } from "@/store/editorStore";
+import { useEffect, useRef } from "react";
 
 export const EditorHeader = () => {
-  const { isPlaying, setIsPlaying, currentTime, duration } = useEditorStore();
+  const { isPlaying, setIsPlaying, currentTime, duration, setCurrentTime } = useEditorStore();
+  const animationFrameRef = useRef<number>();
+  const lastTimeRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    if (isPlaying) {
+      const animate = () => {
+        const now = Date.now();
+        const deltaTime = (now - lastTimeRef.current) / 1000;
+        lastTimeRef.current = now;
+
+        setCurrentTime(Math.min(currentTime + deltaTime, duration));
+
+        if (currentTime >= duration) {
+          setIsPlaying(false);
+        } else {
+          animationFrameRef.current = requestAnimationFrame(animate);
+        }
+      };
+
+      lastTimeRef.current = Date.now();
+      animationFrameRef.current = requestAnimationFrame(animate);
+
+      return () => {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+      };
+    }
+  }, [isPlaying, currentTime, duration, setCurrentTime, setIsPlaying]);
+
+  const togglePlayPause = () => {
+    if (currentTime >= duration) {
+      setCurrentTime(0);
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  const skipBackward = () => {
+    setCurrentTime(Math.max(0, currentTime - 5));
+  };
+
+  const skipForward = () => {
+    setCurrentTime(Math.min(duration, currentTime + 5));
+  };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -22,7 +67,7 @@ export const EditorHeader = () => {
           variant="secondary"
           size="icon"
           className="h-8 w-8"
-          onClick={() => {}}
+          onClick={skipBackward}
         >
           <SkipBack className="h-4 w-4" />
         </Button>
@@ -31,7 +76,7 @@ export const EditorHeader = () => {
           variant="default"
           size="icon"
           className="h-10 w-10"
-          onClick={() => setIsPlaying(!isPlaying)}
+          onClick={togglePlayPause}
         >
           {isPlaying ? (
             <Pause className="h-5 w-5" />
@@ -44,7 +89,7 @@ export const EditorHeader = () => {
           variant="secondary"
           size="icon"
           className="h-8 w-8"
-          onClick={() => {}}
+          onClick={skipForward}
         >
           <SkipForward className="h-4 w-4" />
         </Button>
