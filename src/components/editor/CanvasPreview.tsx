@@ -376,6 +376,14 @@ export const CanvasPreview = () => {
             height
           );
         }
+      } else if (asset.type === 'text' && asset.textProperties) {
+        // Render text
+        const { content, fontSize, color, fontFamily } = asset.textProperties;
+        ctx.font = `${fontSize * scale.x}px ${fontFamily}`;
+        ctx.fillStyle = color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(content, position.x, position.y);
       }
 
       ctx.restore();

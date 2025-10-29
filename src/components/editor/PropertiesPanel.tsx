@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useEditorStore } from "@/store/editorStore";
-import { Settings, Play, Pause, Box, Zap, Plus, Trash2, Scissors, Eraser } from "lucide-react";
+import { Settings, Play, Pause, Box, Zap, Plus, Trash2, Scissors, Eraser, Type } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { removeBackgroundFromImage, loadImage } from "@/lib/gifProcessor";
@@ -15,7 +15,7 @@ import { useState } from "react";
 import { EraserCanvas } from "./EraserCanvas";
 
 export const PropertiesPanel = () => {
-  const { selectedClipId, tracks, updateClip, assets, currentTime, addAsset } = useEditorStore();
+  const { selectedClipId, tracks, updateClip, assets, currentTime, addAsset, updateAsset } = useEditorStore();
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [showEraser, setShowEraser] = useState(false);
 
@@ -26,6 +26,18 @@ export const PropertiesPanel = () => {
   const asset = selectedClip ? assets.find(a => a.id === selectedClip.assetId) : null;
   const is3D = asset?.type === '3d';
   const isImage = asset?.type === 'image';
+  const isText = asset?.type === 'text';
+
+  const handleTextPropertyChange = (property: string, value: any) => {
+    if (!selectedClip || !asset || !asset.textProperties) return;
+    
+    updateAsset(asset.id, {
+      textProperties: {
+        ...asset.textProperties,
+        [property]: value,
+      },
+    });
+  };
 
   const handleRemoveBackground = async () => {
     if (!asset || !isImage) return;
@@ -539,6 +551,67 @@ export const PropertiesPanel = () => {
               <p className="text-xs text-muted-foreground">
                 Pinta sobre las áreas que quieres eliminar. Perfecto para borrar detalles específicos.
               </p>
+            </Card>
+          )}
+
+          {isText && asset.textProperties && (
+            <Card className="p-4 space-y-4">
+              <h3 className="font-medium text-sm flex items-center gap-2">
+                <Type className="h-4 w-4" />
+                Propiedades de Texto
+              </h3>
+              
+              <div className="space-y-2">
+                <Label className="text-xs">Contenido</Label>
+                <Input
+                  value={asset.textProperties.content}
+                  onChange={(e) => handleTextPropertyChange('content', e.target.value)}
+                  placeholder="Escribe tu texto..."
+                  className="h-8"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <Label className="text-xs">Tamaño</Label>
+                  <Input
+                    type="number"
+                    value={asset.textProperties.fontSize}
+                    onChange={(e) => handleTextPropertyChange('fontSize', Number(e.target.value))}
+                    min={12}
+                    max={200}
+                    className="h-8"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Color</Label>
+                  <Input
+                    type="color"
+                    value={asset.textProperties.color}
+                    onChange={(e) => handleTextPropertyChange('color', e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs">Fuente</Label>
+                <select
+                  value={asset.textProperties.fontFamily}
+                  onChange={(e) => handleTextPropertyChange('fontFamily', e.target.value)}
+                  className="w-full h-8 px-3 rounded-md bg-input border border-border text-sm"
+                >
+                  <option value="Arial">Arial</option>
+                  <option value="Times New Roman">Times New Roman</option>
+                  <option value="Courier New">Courier New</option>
+                  <option value="Georgia">Georgia</option>
+                  <option value="Verdana">Verdana</option>
+                  <option value="Comic Sans MS">Comic Sans MS</option>
+                  <option value="Impact">Impact</option>
+                  <option value="Trebuchet MS">Trebuchet MS</option>
+                </select>
+              </div>
             </Card>
           )}
 

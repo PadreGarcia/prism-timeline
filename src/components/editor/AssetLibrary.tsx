@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Upload, Video, Image, Music, Box, FolderOpen } from "lucide-react";
+import { Upload, Video, Image, Music, Box, FolderOpen, Type, Sparkles } from "lucide-react";
 import { useEditorStore, Asset, AssetType } from "@/store/editorStore";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -78,6 +78,8 @@ export const AssetLibrary = () => {
       case 'image': return <Image className="h-4 w-4" />;
       case 'audio': return <Music className="h-4 w-4" />;
       case '3d': return <Box className="h-4 w-4" />;
+      case 'text': return <Type className="h-4 w-4" />;
+      case 'effect': return <Sparkles className="h-4 w-4" />;
       default: return null;
     }
   };
@@ -90,6 +92,8 @@ export const AssetLibrary = () => {
     { id: 'all' as const, label: 'All', icon: FolderOpen, count: assets.length },
     { id: 'video' as const, label: 'Video', icon: Video, count: assets.filter(a => a.type === 'video').length },
     { id: 'image' as const, label: 'Images', icon: Image, count: assets.filter(a => a.type === 'image').length },
+    { id: 'text' as const, label: 'Text', icon: Type, count: assets.filter(a => a.type === 'text').length },
+    { id: 'effect' as const, label: 'Effects', icon: Sparkles, count: assets.filter(a => a.type === 'effect').length },
     { id: 'audio' as const, label: 'Audio', icon: Music, count: assets.filter(a => a.type === 'audio').length },
     { id: '3d' as const, label: '3D', icon: Box, count: assets.filter(a => a.type === '3d').length },
   ];
@@ -219,7 +223,15 @@ export const AssetLibrary = () => {
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex-shrink-0">
-                      {asset.thumbnail ? (
+                      {asset.type === 'text' && asset.textProperties ? (
+                        <div className="h-10 w-10 bg-primary/10 rounded flex items-center justify-center border-2 border-primary/30 group-hover:border-primary/50">
+                          <Type className="h-5 w-5 text-primary" />
+                        </div>
+                      ) : asset.type === 'effect' ? (
+                        <div className="h-10 w-10 bg-accent/10 rounded flex items-center justify-center border-2 border-accent/30 group-hover:border-accent/50">
+                          <Sparkles className="h-5 w-5 text-accent" />
+                        </div>
+                      ) : asset.thumbnail ? (
                         <img 
                           src={asset.thumbnail} 
                           alt={asset.name} 
@@ -233,7 +245,10 @@ export const AssetLibrary = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium truncate group-hover:text-primary transition-colors">
-                        {asset.name}
+                        {asset.type === 'text' && asset.textProperties 
+                          ? asset.textProperties.content.substring(0, 30) + (asset.textProperties.content.length > 30 ? '...' : '')
+                          : asset.name
+                        }
                       </p>
                       <p className="text-xs text-muted-foreground capitalize">
                         {asset.type}

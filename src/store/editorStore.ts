@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type AssetType = 'video' | 'image' | 'audio' | '3d';
+export type AssetType = 'video' | 'image' | 'audio' | '3d' | 'text' | 'effect';
 
 export interface Asset {
   id: string;
@@ -9,6 +9,18 @@ export interface Asset {
   url: string;
   thumbnail?: string;
   duration?: number;
+  textProperties?: {
+    content: string;
+    fontSize: number;
+    color: string;
+    fontFamily: string;
+  };
+  effectProperties?: {
+    effectId: string;
+    effectType: 'image' | 'video' | 'text';
+    filter?: string;
+    animation?: string;
+  };
 }
 
 export interface TimelineClip {
@@ -65,6 +77,7 @@ interface EditorState {
   // Actions
   addAsset: (asset: Asset) => void;
   removeAsset: (id: string) => void;
+  updateAsset: (id: string, updates: Partial<Asset>) => void;
   addTrack: (track: Track) => void;
   removeTrack: (id: string) => void;
   addClipToTrack: (trackId: string, clip: TimelineClip) => void;
@@ -81,8 +94,9 @@ export const useEditorStore = create<EditorState>((set) => ({
   tracks: [
     { id: 'track-1', name: 'Video Track 1', type: 'video', clips: [] },
     { id: 'track-2', name: 'Image Track 1', type: 'image', clips: [] },
-    { id: 'track-3', name: '3D Track 1', type: '3d', clips: [] },
-    { id: 'track-4', name: 'Audio Track 1', type: 'audio', clips: [] },
+    { id: 'track-3', name: 'Text Track 1', type: 'text', clips: [] },
+    { id: 'track-4', name: '3D Track 1', type: '3d', clips: [] },
+    { id: 'track-5', name: 'Audio Track 1', type: 'audio', clips: [] },
   ],
   selectedClipId: null,
   currentTime: 0,
@@ -96,6 +110,12 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   removeAsset: (id) => set((state) => ({
     assets: state.assets.filter((a) => a.id !== id),
+  })),
+
+  updateAsset: (id, updates) => set((state) => ({
+    assets: state.assets.map((asset) =>
+      asset.id === id ? { ...asset, ...updates } : asset
+    ),
   })),
 
   addTrack: (track) => set((state) => ({
