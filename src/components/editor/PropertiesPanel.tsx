@@ -55,6 +55,15 @@ export const PropertiesPanel = () => {
     }
   };
 
+  const toggleAnimatedGif = () => {
+    if (!selectedClip || !isImage) return;
+    
+    const isCurrentlyAnimated = selectedClip.properties.isAnimatedGif || false;
+    handlePropertyChange('isAnimatedGif', !isCurrentlyAnimated);
+    
+    toast.success(isCurrentlyAnimated ? "GIF estático activado" : "GIF animado activado");
+  };
+
   if (!selectedClip) {
     return (
       <div className="w-80 bg-panel-content border-l border-border flex flex-col">
@@ -481,8 +490,20 @@ export const PropertiesPanel = () => {
             <Card className="p-4 space-y-4">
               <h3 className="font-medium text-sm flex items-center gap-2">
                 <Scissors className="h-4 w-4" />
-                Background Removal
+                Imagen / GIF
               </h3>
+              
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">GIF Animado</Label>
+                <Switch
+                  checked={selectedClip.properties.isAnimatedGif || false}
+                  onCheckedChange={toggleAnimatedGif}
+                />
+              </div>
+              
+              <p className="text-xs text-muted-foreground mb-3">
+                Activa esto si es un GIF animado para que se mueva correctamente.
+              </p>
               
               <Button
                 onClick={handleRemoveBackground}

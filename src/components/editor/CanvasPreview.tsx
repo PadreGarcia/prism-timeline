@@ -153,6 +153,7 @@ export const CanvasPreview = () => {
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const [mediaLoaded, setMediaLoaded] = useState<Set<string>>(new Set());
   const [active3DClips, setActive3DClips] = useState<any[]>([]);
+  const [activeGifClips, setActiveGifClips] = useState<any[]>([]);
   
   const { currentTime, tracks, assets, isPlaying, updateClip } = useEditorStore();
 
@@ -257,6 +258,25 @@ export const CanvasPreview = () => {
     setActive3DClips(active3D);
   }, [currentTime, tracks, assets]);
 
+  // Update active GIF clips
+  useEffect(() => {
+    const activeGifs = tracks.flatMap((track) => 
+      track.clips
+        .filter(clip => {
+          const asset = assets.find(a => a.id === clip.assetId);
+          return asset?.type === 'image' && 
+                 clip.properties.isAnimatedGif &&
+                 currentTime >= clip.startTime && 
+                 currentTime < clip.startTime + clip.duration;
+        })
+        .map(clip => {
+          const asset = assets.find(a => a.id === clip.assetId);
+          return { clip, asset };
+        })
+    );
+    setActiveGifClips(activeGifs);
+  }, [currentTime, tracks, assets]);
+
   // Update video times based on currentTime and play/pause
   useEffect(() => {
     tracks.forEach((track) => {
@@ -312,10 +332,13 @@ export const CanvasPreview = () => {
         .map(clip => ({ ...clip, track }))
     );
 
-    // Draw each active clip
+    // Draw each active clip (excluding animated GIFs which are rendered in overlay)
     activeClips.forEach((clipData) => {
       const asset = assets.find(a => a.id === clipData.assetId);
       if (!asset) return;
+
+      // Skip animated GIFs as they're rendered in overlay
+      if (asset.type === 'image' && clipData.properties.isAnimatedGif) return;
 
       const opacity = clipData.properties.opacity ?? 1;
       const scale = clipData.properties.scale ?? { x: 1, y: 1 };
@@ -384,6 +407,50 @@ export const CanvasPreview = () => {
           className="w-full h-full"
           style={{ aspectRatio: '16/9' }}
         />
+        
+        {/* Animated GIF overlay */}
+        {activeGifClips.length > 0 && (
+          <div className="absolute inset-0 pointer-events-none">
+            {activeGifClips.map(({ clip, asset }) => {
+              if (!asset) return null;
+              
+              const canvasWidth = 1920;
+              const canvasHeight = 1080;
+              const scale = clip.properties.scale || { x: 1, y: 1 };
+              const position = clip.properties.position || { x: canvasWidth / 2, y: canvasHeight / 2 };
+              const opacity = clip.properties.opacity ?? 1;
+              
+              const img = imageRefs.current.get(asset.id);
+              if (!img) return null;
+              
+              const width = (img.naturalWidth * scale.x);
+              const height = (img.naturalHeight * scale.y);
+              
+              // Convert canvas coordinates to percentage
+              const leftPercent = ((position.x - width / 2) / canvasWidth) * 100;
+              const topPercent = ((position.y - height / 2) / canvasHeight) * 100;
+              const widthPercent = (width / canvasWidth) * 100;
+              const heightPercent = (height / canvasHeight) * 100;
+              
+              return (
+                <img
+                  key={clip.id}
+                  src={asset.url}
+                  alt={asset.name}
+                  style={{
+                    position: 'absolute',
+                    left: `${leftPercent}%`,
+                    top: `${topPercent}%`,
+                    width: `${widthPercent}%`,
+                    height: `${heightPercent}%`,
+                    opacity: opacity,
+                    objectFit: 'contain',
+                  }}
+                />
+              );
+            })}
+          </div>
+        )}
         
         {/* 3D Canvas overlay */}
         {active3DClips.length > 0 && (
