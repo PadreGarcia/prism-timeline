@@ -405,8 +405,6 @@ export const CanvasPreview = () => {
                   />
                 );
               })}
-              
-              <OrbitControls enableZoom={false} enablePan={false} />
             </Canvas>
           </div>
         )}
