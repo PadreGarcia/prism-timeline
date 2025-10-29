@@ -62,7 +62,9 @@ export const useEditorStore = create<EditorState>((set) => ({
   assets: [],
   tracks: [
     { id: 'track-1', name: 'Video Track 1', type: 'video', clips: [] },
-    { id: 'track-2', name: 'Audio Track 1', type: 'audio', clips: [] },
+    { id: 'track-2', name: 'Image Track 1', type: 'image', clips: [] },
+    { id: 'track-3', name: '3D Track 1', type: '3d', clips: [] },
+    { id: 'track-4', name: 'Audio Track 1', type: 'audio', clips: [] },
   ],
   selectedClipId: null,
   currentTime: 0,
