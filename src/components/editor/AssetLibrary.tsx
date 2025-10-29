@@ -60,6 +60,19 @@ export const AssetLibrary = () => {
   const handleDragStart = (e: React.DragEvent, asset: Asset) => {
     e.dataTransfer.setData('application/json', JSON.stringify(asset));
     e.dataTransfer.effectAllowed = 'copy';
+    
+    // Create a custom drag image
+    const dragImage = e.currentTarget.cloneNode(true) as HTMLElement;
+    dragImage.style.position = 'absolute';
+    dragImage.style.top = '-1000px';
+    dragImage.style.opacity = '0.8';
+    dragImage.style.transform = 'rotate(2deg)';
+    document.body.appendChild(dragImage);
+    e.dataTransfer.setDragImage(dragImage, 50, 20);
+    
+    setTimeout(() => {
+      document.body.removeChild(dragImage);
+    }, 0);
   };
 
   const getIcon = (type: string) => {
@@ -118,12 +131,12 @@ export const AssetLibrary = () => {
                   {assetsByType.video.map((asset) => (
                     <Card 
                       key={asset.id} 
-                      className="p-2 cursor-move hover:bg-secondary/50 transition-colors"
+                      className="p-2 cursor-move hover:bg-secondary/50 hover:scale-105 transition-all active:scale-95 active:rotate-2"
                       draggable
                       onDragStart={(e) => handleDragStart(e, asset)}
                     >
                       <div className="flex items-center gap-2">
-                        <Video className="h-3 w-3 flex-shrink-0" />
+                        <Video className="h-3 w-3 flex-shrink-0 text-primary" />
                         <p className="text-xs font-medium truncate">{asset.name}</p>
                       </div>
                     </Card>
@@ -144,13 +157,13 @@ export const AssetLibrary = () => {
                   {assetsByType.image.map((asset) => (
                     <Card 
                       key={asset.id} 
-                      className="p-2 cursor-move hover:bg-secondary/50 transition-colors"
+                      className="p-2 cursor-move hover:bg-secondary/50 hover:scale-105 transition-all active:scale-95 active:rotate-2"
                       draggable
                       onDragStart={(e) => handleDragStart(e, asset)}
                     >
                       <div className="flex items-center gap-2">
                         {asset.thumbnail && (
-                          <img src={asset.thumbnail} alt={asset.name} className="h-8 w-8 object-cover rounded flex-shrink-0" />
+                          <img src={asset.thumbnail} alt={asset.name} className="h-8 w-8 object-cover rounded flex-shrink-0 ring-1 ring-primary/20" />
                         )}
                         <p className="text-xs font-medium truncate">{asset.name}</p>
                       </div>
@@ -172,12 +185,12 @@ export const AssetLibrary = () => {
                   {assetsByType.audio.map((asset) => (
                     <Card 
                       key={asset.id} 
-                      className="p-2 cursor-move hover:bg-secondary/50 transition-colors"
+                      className="p-2 cursor-move hover:bg-secondary/50 hover:scale-105 transition-all active:scale-95 active:rotate-2"
                       draggable
                       onDragStart={(e) => handleDragStart(e, asset)}
                     >
                       <div className="flex items-center gap-2">
-                        <Music className="h-3 w-3 flex-shrink-0" />
+                        <Music className="h-3 w-3 flex-shrink-0 text-primary" />
                         <p className="text-xs font-medium truncate">{asset.name}</p>
                       </div>
                     </Card>
@@ -198,12 +211,12 @@ export const AssetLibrary = () => {
                   {assetsByType['3d'].map((asset) => (
                     <Card 
                       key={asset.id} 
-                      className="p-2 cursor-move hover:bg-secondary/50 transition-colors"
+                      className="p-2 cursor-move hover:bg-secondary/50 hover:scale-105 transition-all active:scale-95 active:rotate-2"
                       draggable
                       onDragStart={(e) => handleDragStart(e, asset)}
                     >
                       <div className="flex items-center gap-2">
-                        <Box className="h-3 w-3 flex-shrink-0" />
+                        <Box className="h-3 w-3 flex-shrink-0 text-primary" />
                         <p className="text-xs font-medium truncate">{asset.name}</p>
                       </div>
                     </Card>

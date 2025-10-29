@@ -6,7 +6,13 @@ import { toast } from "sonner";
 
 export const Timeline = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [dropPreview, setDropPreview] = useState<{
+    trackIndex: number;
+    time: number;
+    assetName: string;
+  } | null>(null);
   
   const { 
     tracks, 
@@ -17,10 +23,13 @@ export const Timeline = () => {
     setCurrentTime,
     selectClip,
     selectedClipId,
-    addClipToTrack
+    addClipToTrack,
+    assets
   } = useEditorStore();
 
   const pixelsPerSecond = 50 * zoom;
+  const rulerHeight = 30;
+  const trackHeight = 60;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -69,7 +78,6 @@ export const Timeline = () => {
     }
 
     // Draw tracks
-    const trackHeight = 60;
     const trackPadding = 8;
     let currentY = rulerHeight;
 
@@ -117,6 +125,29 @@ export const Timeline = () => {
       currentY += trackHeight;
     });
 
+    // Draw drop preview
+    if (dropPreview) {
+      const previewY = rulerHeight + (dropPreview.trackIndex * trackHeight) + trackPadding;
+      const previewX = dropPreview.time * pixelsPerSecond;
+      const previewWidth = 100; // Default preview width
+      const previewHeight = trackHeight - (trackPadding * 2);
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(74, 174, 217, 0.3)';
+      ctx.fillRect(previewX, previewY, previewWidth, previewHeight);
+      
+      ctx.strokeStyle = '#4aaed9';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.strokeRect(previewX, previewY, previewWidth, previewHeight);
+      
+      ctx.fillStyle = '#4aaed9';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(dropPreview.assetName, previewX + previewWidth / 2, previewY + previewHeight / 2);
+      ctx.restore();
+    }
+
     // Draw playhead
     const playheadX = currentTime * pixelsPerSecond;
     ctx.strokeStyle = '#4aaed9';
@@ -132,7 +163,7 @@ export const Timeline = () => {
     ctx.arc(playheadX, 15, 6, 0, Math.PI * 2);
     ctx.fill();
 
-  }, [tracks, currentTime, duration, zoom, selectedClipId, pixelsPerSecond]);
+  }, [tracks, currentTime, duration, zoom, selectedClipId, pixelsPerSecond, dropPreview]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -177,15 +208,45 @@ export const Timeline = () => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     setIsDraggingOver(true);
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    try {
+      const data = e.dataTransfer.types.includes('application/json');
+      if (!data) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      const dropTime = Math.max(0, x / pixelsPerSecond);
+      const trackIndex = Math.floor((y - rulerHeight) / trackHeight);
+
+      if (trackIndex >= 0 && trackIndex < tracks.length) {
+        // Try to get asset name from drag data (this is a preview, actual data comes in drop)
+        setDropPreview({
+          trackIndex,
+          time: dropTime,
+          assetName: 'Drop here',
+        });
+      } else {
+        setDropPreview(null);
+      }
+    } catch (error) {
+      // Ignore errors during drag over
+    }
   };
 
   const handleDragLeave = () => {
     setIsDraggingOver(false);
+    setDropPreview(null);
   };
 
   const handleDrop = (e: React.DragEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     setIsDraggingOver(false);
+    setDropPreview(null);
 
     try {
       const data = e.dataTransfer.getData('application/json');
@@ -198,12 +259,11 @@ export const Timeline = () => {
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      // Calculate drop position
-      const dropTime = Math.max(0, x / pixelsPerSecond);
+      // Calculate drop position with snap to grid (optional)
+      const rawDropTime = Math.max(0, x / pixelsPerSecond);
+      const dropTime = Math.round(rawDropTime * 4) / 4; // Snap to 0.25s grid
       
       // Find which track was dropped on
-      const rulerHeight = 30;
-      const trackHeight = 60;
       const trackIndex = Math.floor((y - rulerHeight) / trackHeight);
 
       if (trackIndex >= 0 && trackIndex < tracks.length) {
@@ -211,8 +271,16 @@ export const Timeline = () => {
         
         // Check if asset type matches track type
         if (track.type !== asset.type) {
-          toast.error(`Cannot add ${asset.type} to ${track.type} track`);
+          toast.error(`Cannot add ${asset.type} to ${track.type} track. Drop on a ${asset.type} track.`);
           return;
+        }
+
+        // Get default duration based on asset type
+        let defaultDuration = 5;
+        if (asset.type === 'video' || asset.type === 'audio') {
+          defaultDuration = 10;
+        } else if (asset.type === '3d') {
+          defaultDuration = 8;
         }
 
         const newClip: TimelineClip = {
@@ -220,16 +288,20 @@ export const Timeline = () => {
           assetId: asset.id,
           trackId: track.id,
           startTime: dropTime,
-          duration: asset.type === 'image' ? 5 : 10, // Default durations
+          duration: defaultDuration,
           properties: {
             opacity: 1,
             volume: asset.type === 'audio' || asset.type === 'video' ? 1 : undefined,
+            scale: { x: 1, y: 1 },
+            position: { x: 960, y: 540 }, // Center of 1920x1080
           },
         };
 
         addClipToTrack(track.id, newClip);
         selectClip(newClip.id);
-        toast.success(`Added ${asset.name} to ${track.name}`);
+        toast.success(`Added ${asset.name} to ${track.name} at ${dropTime.toFixed(2)}s`);
+      } else {
+        toast.error('Drop on a valid track');
       }
     } catch (error) {
       console.error('Error handling drop:', error);
@@ -261,18 +333,25 @@ export const Timeline = () => {
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-auto relative">
+      <div 
+        ref={containerRef}
+        className="flex-1 overflow-auto relative"
+      >
         <canvas
           ref={canvasRef}
-          className={`w-full h-full cursor-pointer ${isDraggingOver ? 'ring-2 ring-primary' : ''}`}
+          className={`w-full h-full cursor-pointer transition-all ${
+            isDraggingOver ? 'ring-2 ring-primary ring-inset' : ''
+          }`}
           onClick={handleCanvasClick}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         />
         {isDraggingOver && (
-          <div className="absolute inset-0 bg-primary/10 pointer-events-none flex items-center justify-center">
-            <p className="text-primary font-semibold">Drop here to add to timeline</p>
+          <div className="absolute inset-0 bg-primary/5 pointer-events-none flex items-center justify-center backdrop-blur-sm">
+            <div className="bg-background/90 px-6 py-3 rounded-lg border-2 border-primary border-dashed">
+              <p className="text-primary font-semibold text-sm">Drop on track to add clip</p>
+            </div>
           </div>
         )}
       </div>
