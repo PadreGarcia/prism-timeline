@@ -29,9 +29,6 @@ function resizeImageIfNeeded(canvas: HTMLCanvasElement, ctx: CanvasRenderingCont
 export const removeBackgroundFromImage = async (imageElement: HTMLImageElement): Promise<Blob> => {
   try {
     console.log('Starting background removal...');
-    const segmenter = await pipeline('image-segmentation', 'Xenova/segformer-b0-finetuned-ade-512-512', {
-      device: 'webgpu',
-    });
     
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -41,13 +38,37 @@ export const removeBackgroundFromImage = async (imageElement: HTMLImageElement):
     const { width, height } = resizeImageIfNeeded(canvas, ctx, imageElement);
     console.log(`Processing image: ${width}x${height}`);
     
-    const imageData = canvas.toDataURL('image/jpeg', 0.8);
-    const result = await segmenter(imageData);
+    // Get image data for color analysis
+    const originalImageData = ctx.getImageData(0, 0, width, height);
+    const pixels = originalImageData.data;
     
-    if (!result || !Array.isArray(result) || result.length === 0 || !result[0].mask) {
-      throw new Error('Invalid segmentation result');
-    }
+    // Detect background color (sample corners)
+    const corners = [
+      { x: 0, y: 0 },
+      { x: width - 1, y: 0 },
+      { x: 0, y: height - 1 },
+      { x: width - 1, y: height - 1 }
+    ];
     
+    const bgColors = corners.map(corner => {
+      const idx = (corner.y * width + corner.x) * 4;
+      return {
+        r: pixels[idx],
+        g: pixels[idx + 1],
+        b: pixels[idx + 2]
+      };
+    });
+    
+    // Calculate average background color
+    const avgBgColor = {
+      r: bgColors.reduce((sum, c) => sum + c.r, 0) / bgColors.length,
+      g: bgColors.reduce((sum, c) => sum + c.g, 0) / bgColors.length,
+      b: bgColors.reduce((sum, c) => sum + c.b, 0) / bgColors.length
+    };
+    
+    console.log('Detected background color:', avgBgColor);
+    
+    // Create output with transparency
     const outputCanvas = document.createElement('canvas');
     outputCanvas.width = width;
     outputCanvas.height = height;
@@ -56,14 +77,28 @@ export const removeBackgroundFromImage = async (imageElement: HTMLImageElement):
     if (!outputCtx) throw new Error('Could not get output canvas context');
     
     outputCtx.drawImage(canvas, 0, 0);
-    
     const outputImageData = outputCtx.getImageData(0, 0, width, height);
     const data = outputImageData.data;
     
-    // Apply inverted mask to alpha channel
-    for (let i = 0; i < result[0].mask.data.length; i++) {
-      const alpha = Math.round((1 - result[0].mask.data[i]) * 255);
-      data[i * 4 + 3] = alpha;
+    // Remove background based on color similarity
+    const threshold = 40; // Tolerance for color matching
+    
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      
+      // Calculate color difference from background
+      const diff = Math.sqrt(
+        Math.pow(r - avgBgColor.r, 2) +
+        Math.pow(g - avgBgColor.g, 2) +
+        Math.pow(b - avgBgColor.b, 2)
+      );
+      
+      // If pixel is similar to background, make it transparent
+      if (diff < threshold) {
+        data[i + 3] = 0; // Set alpha to 0 (transparent)
+      }
     }
     
     outputCtx.putImageData(outputImageData, 0, 0);
