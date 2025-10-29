@@ -1,10 +1,13 @@
-import { useRef, useEffect } from "react";
-import { useEditorStore } from "@/store/editorStore";
+import { useRef, useEffect, useState } from "react";
+import { useEditorStore, Asset, TimelineClip } from "@/store/editorStore";
 import { Button } from "@/components/ui/button";
 import { Plus, Minus } from "lucide-react";
+import { toast } from "sonner";
 
 export const Timeline = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  
   const { 
     tracks, 
     currentTime, 
@@ -13,7 +16,8 @@ export const Timeline = () => {
     setZoom, 
     setCurrentTime,
     selectClip,
-    selectedClipId 
+    selectedClipId,
+    addClipToTrack
   } = useEditorStore();
 
   const pixelsPerSecond = 50 * zoom;
@@ -169,6 +173,70 @@ export const Timeline = () => {
     selectClip(null);
   };
 
+  const handleDragOver = (e: React.DragEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+
+    try {
+      const data = e.dataTransfer.getData('application/json');
+      const asset: Asset = JSON.parse(data);
+
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      // Calculate drop position
+      const dropTime = Math.max(0, x / pixelsPerSecond);
+      
+      // Find which track was dropped on
+      const rulerHeight = 30;
+      const trackHeight = 60;
+      const trackIndex = Math.floor((y - rulerHeight) / trackHeight);
+
+      if (trackIndex >= 0 && trackIndex < tracks.length) {
+        const track = tracks[trackIndex];
+        
+        // Check if asset type matches track type
+        if (track.type !== asset.type) {
+          toast.error(`Cannot add ${asset.type} to ${track.type} track`);
+          return;
+        }
+
+        const newClip: TimelineClip = {
+          id: `clip-${Date.now()}-${Math.random()}`,
+          assetId: asset.id,
+          trackId: track.id,
+          startTime: dropTime,
+          duration: asset.type === 'image' ? 5 : 10, // Default durations
+          properties: {
+            opacity: 1,
+            volume: asset.type === 'audio' || asset.type === 'video' ? 1 : undefined,
+          },
+        };
+
+        addClipToTrack(track.id, newClip);
+        selectClip(newClip.id);
+        toast.success(`Added ${asset.name} to ${track.name}`);
+      }
+    } catch (error) {
+      console.error('Error handling drop:', error);
+      toast.error('Failed to add clip to timeline');
+    }
+  };
+
   return (
     <div className="h-64 bg-timeline-bg border-t border-border flex flex-col">
       <div className="p-2 bg-panel-header border-b border-border flex items-center justify-between">
@@ -193,12 +261,20 @@ export const Timeline = () => {
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto relative">
         <canvas
           ref={canvasRef}
-          className="w-full h-full cursor-pointer"
+          className={`w-full h-full cursor-pointer ${isDraggingOver ? 'ring-2 ring-primary' : ''}`}
           onClick={handleCanvasClick}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
         />
+        {isDraggingOver && (
+          <div className="absolute inset-0 bg-primary/10 pointer-events-none flex items-center justify-center">
+            <p className="text-primary font-semibold">Drop here to add to timeline</p>
+          </div>
+        )}
       </div>
     </div>
   );
