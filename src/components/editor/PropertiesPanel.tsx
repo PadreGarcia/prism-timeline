@@ -140,8 +140,9 @@ export const PropertiesPanel = () => {
                     max={Math.PI}
                     step={0.01}
                     onValueChange={(value) => handlePropertyChange('rotation', { 
-                      ...selectedClip.properties.rotation,
-                      x: value[0]
+                      x: value[0],
+                      y: selectedClip.properties.rotation?.y || 0,
+                      z: selectedClip.properties.rotation?.z || 0
                     })}
                   />
                   <span className="text-xs text-muted-foreground">{(selectedClip.properties.rotation?.x || 0).toFixed(2)}</span>
@@ -155,8 +156,9 @@ export const PropertiesPanel = () => {
                     max={Math.PI}
                     step={0.01}
                     onValueChange={(value) => handlePropertyChange('rotation', { 
-                      ...selectedClip.properties.rotation,
-                      y: value[0]
+                      x: selectedClip.properties.rotation?.x || 0,
+                      y: value[0],
+                      z: selectedClip.properties.rotation?.z || 0
                     })}
                   />
                   <span className="text-xs text-muted-foreground">{(selectedClip.properties.rotation?.y || 0).toFixed(2)}</span>
@@ -170,7 +172,8 @@ export const PropertiesPanel = () => {
                     max={Math.PI}
                     step={0.01}
                     onValueChange={(value) => handlePropertyChange('rotation', { 
-                      ...selectedClip.properties.rotation,
+                      x: selectedClip.properties.rotation?.x || 0,
+                      y: selectedClip.properties.rotation?.y || 0,
                       z: value[0]
                     })}
                   />
