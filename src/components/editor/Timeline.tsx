@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { useEditorStore, Asset, TimelineClip } from "@/store/editorStore";
 import { Button } from "@/components/ui/button";
-import { Plus, Minus } from "lucide-react";
+import { Plus, Minus, Volume2, VolumeX, Lock, Unlock } from "lucide-react";
 import { toast } from "sonner";
 
 export const Timeline = () => {
@@ -46,45 +46,67 @@ export const Timeline = () => {
     ctx.fillStyle = '#0f1419';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw time ruler
+    // Draw time ruler with markers every 5 seconds
     const rulerHeight = 30;
     ctx.fillStyle = '#141a21';
     ctx.fillRect(0, 0, canvas.width, rulerHeight);
 
     ctx.strokeStyle = '#2a3441';
     ctx.lineWidth = 1;
-    ctx.font = '11px sans-serif';
+    ctx.font = '10px sans-serif';
     ctx.fillStyle = '#9ca3af';
     ctx.textAlign = 'center';
 
-    for (let i = 0; i <= duration; i++) {
+    // Draw ruler marks every 5 seconds
+    for (let i = 0; i <= duration; i += 5) {
       const x = i * pixelsPerSecond;
       if (x > canvas.width) break;
 
-      const isSecond = i % 1 === 0;
-      if (isSecond) {
-        ctx.beginPath();
-        ctx.moveTo(x, rulerHeight - 10);
-        ctx.lineTo(x, rulerHeight);
-        ctx.stroke();
+      // Major tick at 5-second intervals
+      ctx.beginPath();
+      ctx.moveTo(x, rulerHeight - 12);
+      ctx.lineTo(x, rulerHeight);
+      ctx.stroke();
 
-        ctx.fillText(`${i}s`, x, rulerHeight - 15);
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(x, rulerHeight - 5);
-        ctx.lineTo(x, rulerHeight);
-        ctx.stroke();
+      // Time label
+      const mins = Math.floor(i / 60);
+      const secs = i % 60;
+      const timeLabel = `${mins}:${secs.toString().padStart(2, '0')}`;
+      ctx.fillText(timeLabel, x, rulerHeight - 16);
+
+      // Draw minor ticks (1-second intervals)
+      if (i < duration) {
+        for (let j = 1; j < 5; j++) {
+          const minorX = (i + j) * pixelsPerSecond;
+          if (minorX > canvas.width) break;
+          ctx.beginPath();
+          ctx.moveTo(minorX, rulerHeight - 6);
+          ctx.lineTo(minorX, rulerHeight);
+          ctx.stroke();
+        }
       }
     }
 
-    // Draw tracks
+    // Draw tracks with improved grid pattern
     const trackPadding = 8;
     let currentY = rulerHeight;
 
     tracks.forEach((track, trackIndex) => {
-      // Track background
-      ctx.fillStyle = trackIndex % 2 === 0 ? '#141a21' : '#1a2129';
+      // Track background with alternating colors
+      ctx.fillStyle = trackIndex % 2 === 0 ? '#0f1419' : '#141a21';
       ctx.fillRect(0, currentY, canvas.width, trackHeight);
+
+      // Draw grid lines every 5 seconds
+      ctx.strokeStyle = trackIndex % 2 === 0 ? '#1a2028' : '#1f252e';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= duration; i += 5) {
+        const x = i * pixelsPerSecond;
+        if (x > canvas.width) break;
+        ctx.beginPath();
+        ctx.moveTo(x, currentY);
+        ctx.lineTo(x, currentY + trackHeight);
+        ctx.stroke();
+      }
 
       // Track separator
       ctx.strokeStyle = '#2a3441';
@@ -93,7 +115,7 @@ export const Timeline = () => {
       ctx.lineTo(canvas.width, currentY + trackHeight);
       ctx.stroke();
 
-      // Draw clips
+      // Draw clips with improved styling
       track.clips.forEach((clip) => {
         const clipX = clip.startTime * pixelsPerSecond;
         const clipWidth = clip.duration * pixelsPerSecond;
@@ -102,24 +124,43 @@ export const Timeline = () => {
 
         const isSelected = clip.id === selectedClipId;
 
-        // Clip background
-        ctx.fillStyle = isSelected ? '#4aaed9' : '#2e6d8a';
+        // Clip shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillRect(clipX + 2, clipY + 2, clipWidth, clipHeight);
+
+        // Clip background with gradient
+        const gradient = ctx.createLinearGradient(clipX, clipY, clipX, clipY + clipHeight);
+        if (isSelected) {
+          gradient.addColorStop(0, '#5ab8e0');
+          gradient.addColorStop(1, '#3a92c0');
+        } else {
+          gradient.addColorStop(0, '#2e7a9a');
+          gradient.addColorStop(1, '#1e5a7a');
+        }
+        ctx.fillStyle = gradient;
         ctx.fillRect(clipX, clipY, clipWidth, clipHeight);
 
         // Clip border
         ctx.strokeStyle = isSelected ? '#6cc3e8' : '#4aaed9';
-        ctx.lineWidth = isSelected ? 2 : 1;
+        ctx.lineWidth = isSelected ? 3 : 2;
         ctx.strokeRect(clipX, clipY, clipWidth, clipHeight);
 
-        // Clip name
+        // Clip name with background
+        const asset = assets.find(a => a.id === clip.assetId);
+        const clipName = asset ? asset.name : 'Clip';
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.fillRect(clipX + 4, clipY + 4, Math.min(clipWidth - 8, 120), 16);
+        
         ctx.fillStyle = '#ffffff';
-        ctx.font = '12px sans-serif';
+        ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(
-          track.name,
-          clipX + 8,
-          clipY + clipHeight / 2 + 4
-        );
+        const maxWidth = clipWidth - 12;
+        let displayName = clipName;
+        if (ctx.measureText(displayName).width > maxWidth) {
+          displayName = clipName.substring(0, 15) + '...';
+        }
+        ctx.fillText(displayName, clipX + 6, clipY + 15);
       });
 
       currentY += trackHeight;
@@ -148,19 +189,38 @@ export const Timeline = () => {
       ctx.restore();
     }
 
-    // Draw playhead
+    // Draw playhead with improved styling
     const playheadX = currentTime * pixelsPerSecond;
-    ctx.strokeStyle = '#4aaed9';
+    
+    // Playhead line
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#4aaed9');
+    gradient.addColorStop(1, 'rgba(74, 174, 217, 0.5)');
+    ctx.strokeStyle = gradient;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(playheadX, 0);
+    ctx.moveTo(playheadX, rulerHeight);
     ctx.lineTo(playheadX, canvas.height);
     ctx.stroke();
 
-    // Playhead handle
+    // Playhead handle/head at top
     ctx.fillStyle = '#4aaed9';
+    ctx.strokeStyle = '#2a8bb3';
+    ctx.lineWidth = 2;
+    
+    // Triangle head
     ctx.beginPath();
-    ctx.arc(playheadX, 15, 6, 0, Math.PI * 2);
+    ctx.moveTo(playheadX, rulerHeight);
+    ctx.lineTo(playheadX - 6, rulerHeight - 8);
+    ctx.lineTo(playheadX + 6, rulerHeight - 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Circle on top
+    ctx.beginPath();
+    ctx.arc(playheadX, rulerHeight - 10, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#6cc3e8';
     ctx.fill();
 
   }, [tracks, currentTime, duration, zoom, selectedClipId, pixelsPerSecond, dropPreview]);
@@ -309,51 +369,106 @@ export const Timeline = () => {
     }
   };
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
-    <div className="h-64 bg-timeline-bg border-t border-border flex flex-col">
-      <div className="p-2 bg-panel-header border-b border-border flex items-center justify-between">
-        <h2 className="font-semibold text-sm text-foreground">Timeline</h2>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}
-          >
-            <Minus className="h-3 w-3" />
-          </Button>
-          <span className="text-xs text-muted-foreground px-2">{Math.round(zoom * 100)}%</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setZoom(Math.min(3, zoom + 0.25))}
-          >
-            <Plus className="h-3 w-3" />
+    <div className="h-80 bg-timeline-bg border-t border-border flex flex-col">
+      {/* Header */}
+      <div className="px-4 py-3 bg-panel-header border-b border-border flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <h2 className="font-semibold text-foreground">Timeline</h2>
+          <div className="flex items-center gap-2 bg-secondary/30 px-3 py-1 rounded-md">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}
+            >
+              <Minus className="h-3 w-3" />
+            </Button>
+            <span className="text-xs font-medium text-foreground min-w-[3rem] text-center">
+              {Math.round(zoom * 100)}%
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => setZoom(Math.min(3, zoom + 0.25))}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="h-7 text-xs">
+            <Plus className="h-3 w-3 mr-1" />
+            Add Track
           </Button>
         </div>
       </div>
-      <div 
-        ref={containerRef}
-        className="flex-1 overflow-auto relative"
-      >
-        <canvas
-          ref={canvasRef}
-          className={`w-full h-full cursor-pointer transition-all ${
-            isDraggingOver ? 'ring-2 ring-primary ring-inset' : ''
-          }`}
-          onClick={handleCanvasClick}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        />
-        {isDraggingOver && (
-          <div className="absolute inset-0 bg-primary/5 pointer-events-none flex items-center justify-center backdrop-blur-sm">
-            <div className="bg-background/90 px-6 py-3 rounded-lg border-2 border-primary border-dashed">
-              <p className="text-primary font-semibold text-sm">Drop on track to add clip</p>
+
+      {/* Timeline Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Track Headers */}
+        <div className="w-40 bg-panel-content border-r border-border flex flex-col overflow-y-auto">
+          <div className="h-8 border-b border-border bg-panel-header" />
+          {tracks.map((track) => (
+            <div 
+              key={track.id}
+              className="h-[60px] border-b border-border px-3 py-2 flex flex-col justify-between bg-card"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium truncate">{track.name}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-5 w-5"
+                  title={track.muted ? "Unmute" : "Mute"}
+                >
+                  {track.muted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-5 w-5"
+                  title={track.locked ? "Unlock" : "Lock"}
+                >
+                  {track.locked ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+          ))}
+        </div>
+
+        {/* Timeline Canvas */}
+        <div 
+          ref={containerRef}
+          className="flex-1 overflow-auto relative"
+        >
+          <canvas
+            ref={canvasRef}
+            className={`w-full h-full cursor-pointer transition-all ${
+              isDraggingOver ? 'ring-2 ring-primary ring-inset' : ''
+            }`}
+            onClick={handleCanvasClick}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          />
+          {isDraggingOver && (
+            <div className="absolute inset-0 bg-primary/5 pointer-events-none flex items-center justify-center backdrop-blur-sm">
+              <div className="bg-background/90 px-6 py-3 rounded-lg border-2 border-primary border-dashed">
+                <p className="text-primary font-semibold text-sm">Drop on track to add clip</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
