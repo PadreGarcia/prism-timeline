@@ -449,6 +449,7 @@ export const CanvasPreview = () => {
                     height: `${heightPercent}%`,
                     opacity: opacity,
                     objectFit: 'contain',
+                    pointerEvents: 'none',
                   }}
                 />
               );

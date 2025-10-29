@@ -184,7 +184,7 @@ export const InteractiveCanvas = ({ canvasWidth, canvasHeight }: InteractiveCanv
     <div
       ref={containerRef}
       className="absolute inset-0"
-      style={{ pointerEvents: 'none' }}
+      style={{ pointerEvents: 'none', zIndex: 10 }}
     >
       {/* Selection box */}
       <div
