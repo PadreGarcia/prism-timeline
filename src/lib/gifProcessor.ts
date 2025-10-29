@@ -1,8 +1,4 @@
-import { pipeline, env } from '@huggingface/transformers';
-
-// Configure transformers.js
-env.allowLocalModels = false;
-env.useBrowserCache = true;
+import { parseGIF, decompressFrames } from 'gifuct-js';
 
 const MAX_IMAGE_DIMENSION = 512;
 
@@ -26,97 +22,190 @@ function resizeImageIfNeeded(canvas: HTMLCanvasElement, ctx: CanvasRenderingCont
   return { width, height };
 }
 
+// Detect background color from edges with better sampling
+function detectBackgroundColor(imageData: ImageData): { r: number; g: number; b: number } {
+  const { width, height, data } = imageData;
+  const samples: { r: number; g: number; b: number }[] = [];
+  
+  // Sample all edges (top, bottom, left, right)
+  const sampleInterval = 10;
+  
+  // Top and bottom edges
+  for (let x = 0; x < width; x += sampleInterval) {
+    // Top edge
+    let idx = (0 * width + x) * 4;
+    samples.push({ r: data[idx], g: data[idx + 1], b: data[idx + 2] });
+    
+    // Bottom edge
+    idx = ((height - 1) * width + x) * 4;
+    samples.push({ r: data[idx], g: data[idx + 1], b: data[idx + 2] });
+  }
+  
+  // Left and right edges
+  for (let y = 0; y < height; y += sampleInterval) {
+    // Left edge
+    let idx = (y * width + 0) * 4;
+    samples.push({ r: data[idx], g: data[idx + 1], b: data[idx + 2] });
+    
+    // Right edge
+    idx = (y * width + (width - 1)) * 4;
+    samples.push({ r: data[idx], g: data[idx + 1], b: data[idx + 2] });
+  }
+  
+  // Calculate median color (more robust than average)
+  const sortedR = samples.map(s => s.r).sort((a, b) => a - b);
+  const sortedG = samples.map(s => s.g).sort((a, b) => a - b);
+  const sortedB = samples.map(s => s.b).sort((a, b) => a - b);
+  
+  const mid = Math.floor(samples.length / 2);
+  
+  return {
+    r: sortedR[mid],
+    g: sortedG[mid],
+    b: sortedB[mid]
+  };
+}
+
+// Remove background from image data
+function removeBackgroundFromImageData(imageData: ImageData, bgColor: { r: number; g: number; b: number }, threshold: number = 50): ImageData {
+  const data = imageData.data;
+  
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    
+    // Calculate color difference from background
+    const diff = Math.sqrt(
+      Math.pow(r - bgColor.r, 2) +
+      Math.pow(g - bgColor.g, 2) +
+      Math.pow(b - bgColor.b, 2)
+    );
+    
+    // If pixel is similar to background, make it transparent
+    // Use gradient alpha for smoother edges
+    if (diff < threshold) {
+      const alpha = Math.max(0, Math.min(255, (diff / threshold) * 255));
+      data[i + 3] = alpha;
+    }
+  }
+  
+  return imageData;
+}
+
 export const removeBackgroundFromImage = async (imageElement: HTMLImageElement): Promise<Blob> => {
   try {
     console.log('Starting background removal...');
+    const isGif = imageElement.src.toLowerCase().endsWith('.gif');
     
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) throw new Error('Could not get canvas context');
-    
-    const { width, height } = resizeImageIfNeeded(canvas, ctx, imageElement);
-    console.log(`Processing image: ${width}x${height}`);
-    
-    // Get image data for color analysis
-    const originalImageData = ctx.getImageData(0, 0, width, height);
-    const pixels = originalImageData.data;
-    
-    // Detect background color (sample corners)
-    const corners = [
-      { x: 0, y: 0 },
-      { x: width - 1, y: 0 },
-      { x: 0, y: height - 1 },
-      { x: width - 1, y: height - 1 }
-    ];
-    
-    const bgColors = corners.map(corner => {
-      const idx = (corner.y * width + corner.x) * 4;
-      return {
-        r: pixels[idx],
-        g: pixels[idx + 1],
-        b: pixels[idx + 2]
-      };
-    });
-    
-    // Calculate average background color
-    const avgBgColor = {
-      r: bgColors.reduce((sum, c) => sum + c.r, 0) / bgColors.length,
-      g: bgColors.reduce((sum, c) => sum + c.g, 0) / bgColors.length,
-      b: bgColors.reduce((sum, c) => sum + c.b, 0) / bgColors.length
-    };
-    
-    console.log('Detected background color:', avgBgColor);
-    
-    // Create output with transparency
-    const outputCanvas = document.createElement('canvas');
-    outputCanvas.width = width;
-    outputCanvas.height = height;
-    const outputCtx = outputCanvas.getContext('2d');
-    
-    if (!outputCtx) throw new Error('Could not get output canvas context');
-    
-    outputCtx.drawImage(canvas, 0, 0);
-    const outputImageData = outputCtx.getImageData(0, 0, width, height);
-    const data = outputImageData.data;
-    
-    // Remove background based on color similarity
-    const threshold = 40; // Tolerance for color matching
-    
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
+    if (isGif) {
+      // Process GIF frame by frame
+      console.log('Processing animated GIF...');
+      const response = await fetch(imageElement.src);
+      const buffer = await response.arrayBuffer();
+      const gif = parseGIF(buffer);
+      const frames = decompressFrames(gif, true);
       
-      // Calculate color difference from background
-      const diff = Math.sqrt(
-        Math.pow(r - avgBgColor.r, 2) +
-        Math.pow(g - avgBgColor.g, 2) +
-        Math.pow(b - avgBgColor.b, 2)
-      );
-      
-      // If pixel is similar to background, make it transparent
-      if (diff < threshold) {
-        data[i + 3] = 0; // Set alpha to 0 (transparent)
+      if (!frames || frames.length === 0) {
+        throw new Error('No frames found in GIF');
       }
-    }
-    
-    outputCtx.putImageData(outputImageData, 0, 0);
-    console.log('Background removed successfully');
-    
-    return new Promise((resolve, reject) => {
-      outputCanvas.toBlob(
-        (blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Failed to create blob'));
-          }
-        },
-        'image/png',
-        1.0
+      
+      console.log(`Processing ${frames.length} frames...`);
+      
+      // Get background color from first frame
+      const firstFrame = frames[0];
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = firstFrame.dims.width;
+      tempCanvas.height = firstFrame.dims.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      
+      if (!tempCtx) throw new Error('Could not get canvas context');
+      
+      const firstImageData = new ImageData(
+        new Uint8ClampedArray(firstFrame.patch),
+        firstFrame.dims.width,
+        firstFrame.dims.height
       );
-    });
+      const bgColor = detectBackgroundColor(firstImageData);
+      console.log('Detected background color:', bgColor);
+      
+      // Process each frame
+      const processedFrames: ImageData[] = [];
+      for (const frame of frames) {
+        const frameImageData = new ImageData(
+          new Uint8ClampedArray(frame.patch),
+          frame.dims.width,
+          frame.dims.height
+        );
+        const processed = removeBackgroundFromImageData(frameImageData, bgColor, 45);
+        processedFrames.push(processed);
+      }
+      
+      // For now, return first frame as PNG
+      // TODO: Reconstruct GIF with all frames
+      const outputCanvas = document.createElement('canvas');
+      outputCanvas.width = firstFrame.dims.width;
+      outputCanvas.height = firstFrame.dims.height;
+      const outputCtx = outputCanvas.getContext('2d');
+      
+      if (!outputCtx) throw new Error('Could not get output canvas context');
+      
+      outputCtx.putImageData(processedFrames[0], 0, 0);
+      
+      return new Promise((resolve, reject) => {
+        outputCanvas.toBlob(
+          (blob) => {
+            if (blob) {
+              console.log('GIF processed successfully (first frame)');
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to create blob'));
+            }
+          },
+          'image/png',
+          1.0
+        );
+      });
+    } else {
+      // Process static image
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) throw new Error('Could not get canvas context');
+      
+      const { width, height } = resizeImageIfNeeded(canvas, ctx, imageElement);
+      console.log(`Processing image: ${width}x${height}`);
+      
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const bgColor = detectBackgroundColor(imageData);
+      console.log('Detected background color:', bgColor);
+      
+      const processedImageData = removeBackgroundFromImageData(imageData, bgColor, 45);
+      
+      const outputCanvas = document.createElement('canvas');
+      outputCanvas.width = width;
+      outputCanvas.height = height;
+      const outputCtx = outputCanvas.getContext('2d');
+      
+      if (!outputCtx) throw new Error('Could not get output canvas context');
+      
+      outputCtx.putImageData(processedImageData, 0, 0);
+      console.log('Background removed successfully');
+      
+      return new Promise((resolve, reject) => {
+        outputCanvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to create blob'));
+            }
+          },
+          'image/png',
+          1.0
+        );
+      });
+    }
   } catch (error) {
     console.error('Error removing background:', error);
     throw error;
