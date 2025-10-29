@@ -5,7 +5,7 @@ import { OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
 // Component to render 3D model with animations
-const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded }: any) => {
+const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded, currentClipTime }: any) => {
   const animationMixerRef = useRef<THREE.AnimationMixer | null>(null);
   const activeActionsRef = useRef<THREE.AnimationAction[]>([]);
   
@@ -35,7 +35,7 @@ const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded }: a
     }
   }, [animations, scene, onAnimationsLoaded]);
 
-  // Update active animations
+  // Update active animations based on keyframes or default settings
   useEffect(() => {
     if (!animationMixerRef.current || !animations || animations.length === 0) return;
 
@@ -43,11 +43,36 @@ const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded }: a
     activeActionsRef.current.forEach(action => action.stop());
     activeActionsRef.current = [];
 
-    // Start requested animations
-    const activeAnims = clip.properties?.animations?.active || [];
-    const speed = clip.properties?.animations?.speed || 1;
-    const loop = clip.properties?.animations?.loop !== false;
+    let activeAnims: string[] = [];
+    let speed = 1;
+    let loop = true;
 
+    // Check if we have keyframes and find the appropriate one
+    const keyframes = clip.properties?.animationKeyframes;
+    if (keyframes && keyframes.length > 0) {
+      // Find the most recent keyframe before or at current time
+      const applicableKeyframe = keyframes
+        .filter((kf: any) => kf.time <= currentClipTime)
+        .sort((a: any, b: any) => b.time - a.time)[0];
+      
+      if (applicableKeyframe) {
+        activeAnims = applicableKeyframe.activeAnimations;
+        speed = applicableKeyframe.speed;
+        loop = applicableKeyframe.loop;
+      } else {
+        // Before first keyframe, use default settings
+        activeAnims = clip.properties?.animations?.active || [];
+        speed = clip.properties?.animations?.speed || 1;
+        loop = clip.properties?.animations?.loop !== false;
+      }
+    } else {
+      // No keyframes, use default animation settings
+      activeAnims = clip.properties?.animations?.active || [];
+      speed = clip.properties?.animations?.speed || 1;
+      loop = clip.properties?.animations?.loop !== false;
+    }
+
+    // Start the appropriate animations
     activeAnims.forEach((animName: string) => {
       const animClip = animations.find((a: any) => a.name === animName);
       if (animClip) {
@@ -58,7 +83,7 @@ const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded }: a
         activeActionsRef.current.push(action);
       }
     });
-  }, [clip.properties?.animations, animations]);
+  }, [clip.properties?.animations, clip.properties?.animationKeyframes, animations, currentClipTime]);
 
   // Update mixer on every frame
   useEffect(() => {
@@ -359,6 +384,7 @@ export const CanvasPreview = () => {
                 const pos = clip.properties.position || { x: 0, y: 0, z: 0 };
                 const rot = clip.properties.rotation || { x: 0, y: 0, z: 0 };
                 const scl = clip.properties.scale || { x: 1, y: 1, z: 1 };
+                const clipTime = currentTime - clip.startTime;
                 
                 return (
                   <Model3D
@@ -369,6 +395,7 @@ export const CanvasPreview = () => {
                     rotation={[rot.x, rot.y, rot.z]}
                     scale={[scl.x, scl.y, scl.z || 1]}
                     onAnimationsLoaded={(names: string[]) => handleAnimationsLoaded(clip.id, names)}
+                    currentClipTime={clipTime}
                   />
                 );
               })}

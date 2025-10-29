@@ -6,11 +6,12 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useEditorStore } from "@/store/editorStore";
-import { Settings, Play, Pause, Box, Zap } from "lucide-react";
+import { Settings, Play, Pause, Box, Zap, Plus, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export const PropertiesPanel = () => {
-  const { selectedClipId, tracks, updateClip, assets } = useEditorStore();
+  const { selectedClipId, tracks, updateClip, assets, currentTime } = useEditorStore();
 
   const selectedClip = tracks
     .flatMap(track => track.clips)
@@ -232,6 +233,154 @@ export const PropertiesPanel = () => {
                     loop: checked
                   })}
                 />
+              </div>
+            </Card>
+          )}
+
+          {is3D && selectedClip.properties.animations?.available && selectedClip.properties.animations.available.length > 0 && (
+            <Card className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-sm flex items-center gap-2">
+                  <Zap className="h-4 w-4" />
+                  Animation Timeline
+                </h3>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const keyframes = selectedClip.properties.animationKeyframes || [];
+                    const relativeTime = Math.max(0, Math.min(currentTime - selectedClip.startTime, selectedClip.duration));
+                    const newKeyframe = {
+                      time: relativeTime,
+                      activeAnimations: selectedClip.properties.animations?.active || [],
+                      speed: selectedClip.properties.animations?.speed || 1,
+                      loop: selectedClip.properties.animations?.loop !== false,
+                    };
+                    updateClip(selectedClipId, {
+                      properties: {
+                        ...selectedClip.properties,
+                        animationKeyframes: [...keyframes, newKeyframe].sort((a, b) => a.time - b.time),
+                      },
+                    });
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Keyframe
+                </Button>
+              </div>
+
+              <div className="text-xs text-muted-foreground">
+                Add keyframes to program animation changes over time
+              </div>
+
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {(selectedClip.properties.animationKeyframes || []).length === 0 && (
+                  <div className="text-center py-6 text-xs text-muted-foreground">
+                    No keyframes yet. Click "Add Keyframe" to start.
+                  </div>
+                )}
+                
+                {(selectedClip.properties.animationKeyframes || []).map((keyframe: any, index: number) => (
+                  <div key={index} className="p-3 bg-muted/50 rounded-lg space-y-2 border border-border">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="secondary" className="text-xs">
+                        {keyframe.time.toFixed(2)}s
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          const keyframes = selectedClip.properties.animationKeyframes || [];
+                          updateClip(selectedClipId, {
+                            properties: {
+                              ...selectedClip.properties,
+                              animationKeyframes: keyframes.filter((_: any, i: number) => i !== index),
+                            },
+                          });
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <Label className="text-xs font-medium">Active Animations</Label>
+                      <div className="space-y-1">
+                        {selectedClip.properties.animations!.available.map((animName: string) => (
+                          <div key={animName} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`keyframe-${index}-${animName}`}
+                              checked={keyframe.activeAnimations.includes(animName)}
+                              onCheckedChange={(checked) => {
+                                const keyframes = [...(selectedClip.properties.animationKeyframes || [])];
+                                if (checked) {
+                                  keyframes[index].activeAnimations.push(animName);
+                                } else {
+                                  keyframes[index].activeAnimations = keyframes[index].activeAnimations.filter(
+                                    (a: string) => a !== animName
+                                  );
+                                }
+                                updateClip(selectedClipId, {
+                                  properties: {
+                                    ...selectedClip.properties,
+                                    animationKeyframes: keyframes,
+                                  },
+                                });
+                              }}
+                            />
+                            <label
+                              htmlFor={`keyframe-${index}-${animName}`}
+                              className="text-xs cursor-pointer"
+                            >
+                              {animName}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs">Speed: {keyframe.speed.toFixed(1)}x</Label>
+                      <Slider
+                        value={[keyframe.speed]}
+                        onValueChange={(value) => {
+                          const keyframes = [...(selectedClip.properties.animationKeyframes || [])];
+                          keyframes[index].speed = value[0];
+                          updateClip(selectedClipId, {
+                            properties: {
+                              ...selectedClip.properties,
+                              animationKeyframes: keyframes,
+                            },
+                          });
+                        }}
+                        min={0.1}
+                        max={3}
+                        step={0.1}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id={`keyframe-loop-${index}`}
+                        checked={keyframe.loop}
+                        onCheckedChange={(checked) => {
+                          const keyframes = [...(selectedClip.properties.animationKeyframes || [])];
+                          keyframes[index].loop = checked;
+                          updateClip(selectedClipId, {
+                            properties: {
+                              ...selectedClip.properties,
+                              animationKeyframes: keyframes,
+                            },
+                          });
+                        }}
+                      />
+                      <Label htmlFor={`keyframe-loop-${index}`} className="text-xs">
+                        Loop
+                      </Label>
+                    </div>
+                  </div>
+                ))}
               </div>
             </Card>
           )}

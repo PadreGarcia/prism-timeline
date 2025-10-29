@@ -30,6 +30,13 @@ export interface TimelineClip {
       speed: number;
       loop: boolean;
     };
+    // Animation keyframes for programmed animation changes
+    animationKeyframes?: Array<{
+      time: number; // Time relative to clip start
+      activeAnimations: string[];
+      speed: number;
+      loop: boolean;
+    }>;
     wireframe?: boolean;
     metalness?: number;
     roughness?: number;
