@@ -192,6 +192,9 @@ export const CanvasPreview = () => {
         img.onload = () => {
           setMediaLoaded(prev => new Set(prev).add(asset.id));
         };
+        img.onerror = (err) => {
+          console.error('Error loading image:', asset.url, err);
+        };
         imageRefs.current.set(asset.id, img);
       } else if (asset.type === 'audio' && !audioRefs.current.has(asset.id)) {
         const audio = new Audio();
@@ -337,7 +340,7 @@ export const CanvasPreview = () => {
         }
       } else if (asset.type === 'image') {
         const img = imageRefs.current.get(asset.id);
-        if (img && img.complete) {
+        if (img && img.complete && img.naturalWidth > 0) {
           const width = img.width * scale.x;
           const height = img.height * scale.y;
           
