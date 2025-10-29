@@ -9,15 +9,22 @@ const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded, cur
   const animationMixerRef = useRef<THREE.AnimationMixer | null>(null);
   const activeActionsRef = useRef<THREE.AnimationAction[]>([]);
   const groupRef = useRef<THREE.Group>(null);
+  const [clonedScene, setClonedScene] = useState<THREE.Group | null>(null);
   
   const gltf = useGLTF(url) as any;
-  const scene = gltf?.scene;
+  const originalScene = gltf?.scene;
   const animations = gltf?.animations || [];
 
-  // Load animations
+  // Clone scene once and set up mixer
   useEffect(() => {
-    if (animations && animations.length > 0 && scene) {
-      const mixer = new THREE.AnimationMixer(scene);
+    if (!originalScene) return;
+    
+    const cloned = originalScene.clone();
+    setClonedScene(cloned);
+    
+    // Create mixer on the cloned scene
+    if (animations && animations.length > 0) {
+      const mixer = new THREE.AnimationMixer(cloned);
       animationMixerRef.current = mixer;
       
       // Notify parent about available animations
@@ -26,7 +33,13 @@ const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded, cur
         onAnimationsLoaded(animNames);
       }
     }
-  }, [animations, scene, onAnimationsLoaded]);
+    
+    return () => {
+      if (animationMixerRef.current) {
+        animationMixerRef.current.stopAllAction();
+      }
+    };
+  }, [originalScene, animations.length]);
 
   // Update active animations based on keyframes or default settings
   useEffect(() => {
@@ -87,9 +100,9 @@ const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded, cur
 
   // Apply material properties
   useEffect(() => {
-    if (!groupRef.current) return;
+    if (!clonedScene) return;
     
-    groupRef.current.traverse((child: any) => {
+    clonedScene.traverse((child: any) => {
       if (child.isMesh) {
         // Clone material to avoid affecting other instances
         if (!child.material.userData.isCloned) {
@@ -109,9 +122,9 @@ const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded, cur
         child.material.needsUpdate = true;
       }
     });
-  }, [clip.properties?.wireframe, clip.properties?.metalness, clip.properties?.roughness]);
+  }, [clonedScene, clip.properties?.wireframe, clip.properties?.metalness, clip.properties?.roughness]);
   
-  if (!scene) return null;
+  if (!clonedScene) return null;
   
   return (
     <group 
@@ -120,7 +133,7 @@ const Model3D = ({ clip, url, position, rotation, scale, onAnimationsLoaded, cur
       rotation={rotation || [0, 0, 0]}
       scale={scale || [1, 1, 1]}
     >
-      <primitive object={scene} />
+      <primitive object={clonedScene} />
     </group>
   );
 };
