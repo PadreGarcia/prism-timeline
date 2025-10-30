@@ -552,6 +552,9 @@ export const Timeline = () => {
     try {
       const data = e.dataTransfer.getData('application/json');
       const asset: Asset = JSON.parse(data);
+      
+      console.log('🎯 Asset dropped:', asset);
+      console.log('📋 Available tracks:', tracks);
 
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -563,8 +566,12 @@ export const Timeline = () => {
       const rawDropTime = Math.max(0, x / pixelsPerSecond);
       const dropTime = Math.round(rawDropTime * 4) / 4; // Snap to 0.25s grid
       
+      console.log('⏰ Drop time:', dropTime);
+      
       // Auto-detect the correct track based on asset type
       const targetTrack = tracks.find(track => track.type === asset.type);
+      
+      console.log('🎬 Target track found:', targetTrack);
 
       if (!targetTrack) {
         toast.error(`No ${asset.type} track found. Please add a ${asset.type} track first.`);
@@ -593,8 +600,12 @@ export const Timeline = () => {
         },
       };
 
+      console.log('➕ Adding clip:', newClip);
+      
       addClipToTrack(targetTrack.id, newClip);
       selectClip(newClip.id);
+      
+      console.log('✅ Clip added successfully');
       toast.success(`Added ${asset.name} to ${targetTrack.name} at ${dropTime.toFixed(2)}s`);
     } catch (error) {
       console.error('Error handling drop:', error);
