@@ -39,7 +39,7 @@ export const Timeline = () => {
   } = useEditorStore();
 
   const pixelsPerSecond = 50 * zoom;
-  const rulerHeight = 30;
+  const rulerHeight = 32; // h-8 = 32px in Tailwind
   const trackHeight = 60;
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export const Timeline = () => {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Draw time ruler with markers every 5 seconds
-    const rulerHeight = 30;
+    const rulerHeight = 32;
     ctx.fillStyle = '#141a21';
     ctx.fillRect(0, 0, canvas.width, rulerHeight);
 
@@ -300,7 +300,7 @@ export const Timeline = () => {
     const y = e.clientY - rect.top;
 
     // Check if clicked on a keyframe first
-    const rulerHeight = 30;
+    const rulerHeight = 32;
     const trackHeight = 60;
     let currentY = rulerHeight;
 
@@ -355,7 +355,7 @@ export const Timeline = () => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const rulerHeight = 30;
+    const rulerHeight = 32;
     const trackHeight = 60;
     let currentY = rulerHeight;
 
@@ -656,7 +656,7 @@ export const Timeline = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Track Headers */}
         <div className="w-40 bg-panel-content border-r border-border flex flex-col overflow-y-auto">
-          <div className="h-8 border-b border-border bg-panel-header" />
+          <div className="h-[32px] border-b border-border bg-panel-header" />
           {tracks.map((track) => (
             <div 
               key={track.id}
