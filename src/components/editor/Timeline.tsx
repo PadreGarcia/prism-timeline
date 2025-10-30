@@ -558,52 +558,44 @@ export const Timeline = () => {
 
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
 
       // Calculate drop position with snap to grid (optional)
       const rawDropTime = Math.max(0, x / pixelsPerSecond);
       const dropTime = Math.round(rawDropTime * 4) / 4; // Snap to 0.25s grid
       
-      // Find which track was dropped on
-      const trackIndex = Math.floor((y - rulerHeight) / trackHeight);
+      // Auto-detect the correct track based on asset type
+      const targetTrack = tracks.find(track => track.type === asset.type);
 
-      if (trackIndex >= 0 && trackIndex < tracks.length) {
-        const track = tracks[trackIndex];
-        
-        // Check if asset type matches track type
-        if (track.type !== asset.type) {
-          toast.error(`Cannot add ${asset.type} to ${track.type} track. Drop on a ${asset.type} track.`);
-          return;
-        }
-
-        // Get default duration based on asset type
-        let defaultDuration = 5;
-        if (asset.type === 'video' || asset.type === 'audio') {
-          defaultDuration = 10;
-        } else if (asset.type === '3d') {
-          defaultDuration = 8;
-        }
-
-        const newClip: TimelineClip = {
-          id: `clip-${Date.now()}-${Math.random()}`,
-          assetId: asset.id,
-          trackId: track.id,
-          startTime: dropTime,
-          duration: defaultDuration,
-          properties: {
-            opacity: 1,
-            volume: asset.type === 'audio' || asset.type === 'video' ? 1 : undefined,
-            scale: { x: 1, y: 1 },
-            position: { x: 960, y: 540 }, // Center of 1920x1080
-          },
-        };
-
-        addClipToTrack(track.id, newClip);
-        selectClip(newClip.id);
-        toast.success(`Added ${asset.name} to ${track.name} at ${dropTime.toFixed(2)}s`);
-      } else {
-        toast.error('Drop on a valid track');
+      if (!targetTrack) {
+        toast.error(`No ${asset.type} track found. Please add a ${asset.type} track first.`);
+        return;
       }
+
+      // Get default duration based on asset type
+      let defaultDuration = 5;
+      if (asset.type === 'video' || asset.type === 'audio') {
+        defaultDuration = 10;
+      } else if (asset.type === '3d') {
+        defaultDuration = 8;
+      }
+
+      const newClip: TimelineClip = {
+        id: `clip-${Date.now()}-${Math.random()}`,
+        assetId: asset.id,
+        trackId: targetTrack.id,
+        startTime: dropTime,
+        duration: defaultDuration,
+        properties: {
+          opacity: 1,
+          volume: asset.type === 'audio' || asset.type === 'video' ? 1 : undefined,
+          scale: { x: 1, y: 1 },
+          position: { x: 960, y: 540 }, // Center of 1920x1080
+        },
+      };
+
+      addClipToTrack(targetTrack.id, newClip);
+      selectClip(newClip.id);
+      toast.success(`Added ${asset.name} to ${targetTrack.name} at ${dropTime.toFixed(2)}s`);
     } catch (error) {
       console.error('Error handling drop:', error);
       toast.error('Failed to add clip to timeline');
