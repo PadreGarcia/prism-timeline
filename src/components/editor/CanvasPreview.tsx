@@ -155,6 +155,7 @@ export const CanvasPreview = () => {
   const [mediaLoaded, setMediaLoaded] = useState<Set<string>>(new Set());
   const [active3DClips, setActive3DClips] = useState<any[]>([]);
   const [activeGifClips, setActiveGifClips] = useState<any[]>([]);
+  const [clipsWithEffects, setClipsWithEffects] = useState<any[]>([]);
   
   const { currentTime, tracks, assets, isPlaying, updateClip } = useEditorStore();
 
@@ -278,6 +279,25 @@ export const CanvasPreview = () => {
     setActiveGifClips(activeGifs);
   }, [currentTime, tracks, assets]);
 
+  // Update clips with effects (to render as overlays)
+  useEffect(() => {
+    const effectClips = tracks.flatMap((track) => 
+      track.clips
+        .filter(clip => {
+          const asset = assets.find(a => a.id === clip.assetId);
+          return clip.properties.appliedEffect &&
+                 (asset?.type === 'video' || asset?.type === 'image') &&
+                 currentTime >= clip.startTime && 
+                 currentTime < clip.startTime + clip.duration;
+        })
+        .map(clip => {
+          const asset = assets.find(a => a.id === clip.assetId);
+          return { clip, asset };
+        })
+    );
+    setClipsWithEffects(effectClips);
+  }, [currentTime, tracks, assets]);
+
   // Update video times based on currentTime and play/pause
   useEffect(() => {
     tracks.forEach((track) => {
@@ -340,6 +360,9 @@ export const CanvasPreview = () => {
 
       // Skip animated GIFs as they're rendered in overlay
       if (asset.type === 'image' && clipData.properties.isAnimatedGif) return;
+      
+      // Skip clips with effects as they're rendered in overlay
+      if (clipData.properties.appliedEffect && (asset.type === 'video' || asset.type === 'image')) return;
 
       const opacity = clipData.properties.opacity ?? 1;
       const scale = clipData.properties.scale ?? { x: 1, y: 1 };
@@ -444,11 +467,23 @@ export const CanvasPreview = () => {
               const widthPercent = (width / canvasWidth) * 100;
               const heightPercent = (height / canvasHeight) * 100;
               
+              // Get applied effect classes
+              const appliedEffect = clip.properties.appliedEffect;
+              let effectClasses = '';
+              if (appliedEffect) {
+                if (appliedEffect.animation) {
+                  effectClasses = `animate-${appliedEffect.animation}`;
+                } else if (appliedEffect.filter) {
+                  effectClasses = `filter-${appliedEffect.filter}`;
+                }
+              }
+              
               return (
                 <img
                   key={clip.id}
                   src={asset.url}
                   alt={asset.name}
+                  className={effectClasses}
                   style={{
                     position: 'absolute',
                     left: `${leftPercent}%`,
@@ -461,6 +496,103 @@ export const CanvasPreview = () => {
                   }}
                 />
               );
+            })}
+          </div>
+        )}
+        
+        {/* Effects overlay for videos and images with effects */}
+        {clipsWithEffects.length > 0 && (
+          <div className="absolute inset-0 pointer-events-none">
+            {clipsWithEffects.map(({ clip, asset }) => {
+              if (!asset) return null;
+              
+              const canvasWidth = 1920;
+              const canvasHeight = 1080;
+              const scale = clip.properties.scale || { x: 1, y: 1 };
+              const position = clip.properties.position || { x: canvasWidth / 2, y: canvasHeight / 2 };
+              const opacity = clip.properties.opacity ?? 1;
+              
+              // Get applied effect classes
+              const appliedEffect = clip.properties.appliedEffect;
+              let effectClasses = '';
+              if (appliedEffect) {
+                if (appliedEffect.animation) {
+                  effectClasses = `animate-${appliedEffect.animation}`;
+                } else if (appliedEffect.filter) {
+                  effectClasses = `filter-${appliedEffect.filter}`;
+                }
+              }
+              
+              if (asset.type === 'video') {
+                const video = videoRefs.current.get(asset.id);
+                if (!video) return null;
+                
+                const width = (video.videoWidth * scale.x);
+                const height = (video.videoHeight * scale.y);
+                
+                const leftPercent = ((position.x - width / 2) / canvasWidth) * 100;
+                const topPercent = ((position.y - height / 2) / canvasHeight) * 100;
+                const widthPercent = (width / canvasWidth) * 100;
+                const heightPercent = (height / canvasHeight) * 100;
+                
+                return (
+                  <video
+                    key={clip.id}
+                    ref={(el) => {
+                      if (el && el !== video) {
+                        // Sync the overlay video with the ref video
+                        el.currentTime = video.currentTime;
+                        if (!video.paused) el.play();
+                      }
+                    }}
+                    src={asset.url}
+                    className={effectClasses}
+                    muted
+                    style={{
+                      position: 'absolute',
+                      left: `${leftPercent}%`,
+                      top: `${topPercent}%`,
+                      width: `${widthPercent}%`,
+                      height: `${heightPercent}%`,
+                      opacity: opacity,
+                      objectFit: 'contain',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                );
+              } else if (asset.type === 'image') {
+                const img = imageRefs.current.get(asset.id);
+                if (!img) return null;
+                
+                const width = (img.naturalWidth * scale.x);
+                const height = (img.naturalHeight * scale.y);
+                
+                const leftPercent = ((position.x - width / 2) / canvasWidth) * 100;
+                const topPercent = ((position.y - height / 2) / canvasHeight) * 100;
+                const widthPercent = (width / canvasWidth) * 100;
+                const heightPercent = (height / canvasHeight) * 100;
+                
+                return (
+                  <img
+                    key={clip.id}
+                    src={asset.url}
+                    alt={asset.name}
+                    className={effectClasses}
+                    style={{
+                      position: 'absolute',
+                      left: `${leftPercent}%`,
+                      top: `${topPercent}%`,
+                      width: `${widthPercent}%`,
+                      height: `${heightPercent}%`,
+                      opacity: opacity,
+                      objectFit: 'contain',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                );
+              }
+              
+              return null;
             })}
           </div>
         )}

@@ -14,6 +14,27 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { EraserCanvas } from "./EraserCanvas";
 
+// Helper function to get TikTok effect by ID
+const getTikTokEffect = (id: string) => {
+  const effects = [
+    { id: 'glitch', name: 'Glitch', animation: 'glitch' },
+    { id: 'rgb-split', name: 'RGB Split', filter: 'rgb-split' },
+    { id: 'shake', name: 'Shake', animation: 'shake-intense' },
+    { id: 'zoom-punch', name: 'Zoom Punch', animation: 'zoom-punch' },
+    { id: 'flash-strobe', name: 'Flash', animation: 'flash-strobe' },
+    { id: 'chromatic', name: 'Chromatic', filter: 'chromatic' },
+    { id: 'distortion', name: 'Distortion', filter: 'distortion' },
+    { id: 'vhs', name: 'VHS', filter: 'vhs' },
+  ];
+  return effects.find(e => e.id === id);
+};
+
+// Helper function to get effect name by ID
+const getEffectName = (id: string) => {
+  const effect = getTikTokEffect(id);
+  return effect ? effect.name : id;
+};
+
 export const PropertiesPanel = () => {
   const { selectedClipId, tracks, updateClip, assets, currentTime, addAsset, updateAsset } = useEditorStore();
   const [isRemovingBg, setIsRemovingBg] = useState(false);
@@ -614,6 +635,81 @@ export const PropertiesPanel = () => {
               </div>
             </Card>
           )}
+
+          {/* TikTok / DJ Effects */}
+          <Card className="p-4 space-y-4">
+            <h3 className="font-medium text-sm flex items-center gap-2">
+              <Zap className="w-4 h-4" />
+              TikTok / DJ Effects
+            </h3>
+            
+            {selectedClip.properties.appliedEffect ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-2 bg-accent/10 rounded">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{getEffectName(selectedClip.properties.appliedEffect.effectId)}</p>
+                    <p className="text-xs text-muted-foreground">Aplicado</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      updateClip(selectedClipId, {
+                        properties: {
+                          ...selectedClip.properties,
+                          appliedEffect: undefined,
+                        },
+                      });
+                      toast.success("Efecto removido");
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label className="text-xs">Seleccionar Efecto</Label>
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      const effect = getTikTokEffect(e.target.value);
+                      if (effect) {
+                        updateClip(selectedClipId, {
+                          properties: {
+                            ...selectedClip.properties,
+                            appliedEffect: {
+                              effectId: effect.id,
+                              effectType: 'video',
+                              filter: effect.filter,
+                              animation: effect.animation,
+                            },
+                          },
+                        });
+                        toast.success(`Efecto "${effect.name}" aplicado`);
+                        e.target.value = ''; // Reset select
+                      }
+                    }
+                  }}
+                  className="w-full h-8 px-3 rounded-md bg-input border border-border text-sm"
+                  defaultValue=""
+                >
+                  <option value="">-- Selecciona un efecto --</option>
+                  <option value="glitch">⚡ Glitch</option>
+                  <option value="rgb-split">🌈 RGB Split</option>
+                  <option value="shake">📳 Shake</option>
+                  <option value="zoom-punch">💥 Zoom Punch</option>
+                  <option value="flash-strobe">💡 Flash</option>
+                  <option value="chromatic">🎨 Chromatic</option>
+                  <option value="distortion">🌀 Distortion</option>
+                  <option value="vhs">📼 VHS</option>
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Aplica efectos populares de TikTok y videos DJ
+                </p>
+              </div>
+            )}
+          </Card>
 
           <Card className="p-4 space-y-4">
             <h3 className="font-medium text-sm">Effects</h3>

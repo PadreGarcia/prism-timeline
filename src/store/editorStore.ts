@@ -36,6 +36,13 @@ export interface TimelineClip {
     opacity?: number;
     volume?: number;
     isAnimatedGif?: boolean;
+    // Effects properties
+    appliedEffect?: {
+      effectId: string;
+      effectType: 'image' | 'video' | 'text';
+      filter?: string;
+      animation?: string;
+    };
     // 3D specific properties
     animations?: {
       available: string[];

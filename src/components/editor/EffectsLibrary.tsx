@@ -55,6 +55,17 @@ export const EffectsLibrary = () => {
     { id: 'slide-right', name: 'Deslizar Der', icon: '➡️', description: 'Desliza desde la izquierda' },
   ];
 
+  const tiktokEffects = [
+    { id: 'glitch', name: 'Glitch', icon: '⚡', description: 'Efecto de distorsión glitch', animation: 'glitch' },
+    { id: 'rgb-split', name: 'RGB Split', icon: '🌈', description: 'Separación de canales RGB', filter: 'rgb-split' },
+    { id: 'shake', name: 'Shake', icon: '📳', description: 'Vibración rápida', animation: 'shake-intense' },
+    { id: 'zoom-punch', name: 'Zoom Punch', icon: '💥', description: 'Zoom explosivo', animation: 'zoom-punch' },
+    { id: 'flash-strobe', name: 'Flash', icon: '💡', description: 'Destello estroboscópico', animation: 'flash-strobe' },
+    { id: 'chromatic', name: 'Chromatic', icon: '🎨', description: 'Aberración cromática', filter: 'chromatic' },
+    { id: 'distortion', name: 'Distortion', icon: '🌀', description: 'Distorsión de onda', filter: 'distortion' },
+    { id: 'vhs', name: 'VHS', icon: '📼', description: 'Efecto retro VHS', filter: 'vhs' },
+  ];
+
   const textEffects = [
     { id: 'bounce', name: 'Rebote', icon: '⬆️', animation: 'bounce' },
     { id: 'pulse', name: 'Pulso', icon: '💓', animation: 'pulse' },
@@ -92,9 +103,12 @@ export const EffectsLibrary = () => {
       </div>
 
       <Tabs defaultValue="text" className="flex-1 flex flex-col">
-        <TabsList className="mx-4 mt-4 grid grid-cols-4">
+        <TabsList className="mx-4 mt-4 grid grid-cols-5">
           <TabsTrigger value="text" className="text-xs">
             <Type className="w-4 h-4" />
+          </TabsTrigger>
+          <TabsTrigger value="tiktok" className="text-xs">
+            <Sparkles className="w-3 h-3" />
           </TabsTrigger>
           <TabsTrigger value="image" className="text-xs">
             <ImageIcon className="w-4 h-4" />
@@ -172,6 +186,30 @@ export const EffectsLibrary = () => {
 
             <div className="text-xs text-muted-foreground px-1">
               El texto se agregará a tu biblioteca y podrás arrastrarlo al timeline.
+            </div>
+          </TabsContent>
+
+          <TabsContent value="tiktok" className="p-4 space-y-4 mt-0">
+            <h3 className="font-medium text-sm mb-2">Efectos TikTok / DJ</h3>
+            <div className="space-y-2">
+              {tiktokEffects.map((effect) => (
+                <Card
+                  key={effect.id}
+                  className="p-3 cursor-pointer hover:bg-accent/10 transition-colors"
+                  onClick={() => handleAddEffect(effect, 'video')}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl">{effect.icon}</div>
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">{effect.name}</div>
+                      <div className="text-xs text-muted-foreground">{effect.description}</div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+            <div className="text-xs text-muted-foreground px-1 mt-4">
+              Efectos populares de TikTok y videos de DJ remixes para hacer tus videos más dinámicos.
             </div>
           </TabsContent>
 
